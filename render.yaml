@@ -10,3 +10,7 @@ services:
         value: v19.0
       - key: INTERVALO_SYNC_HORAS
         value: "6"
+      - key: BASE_URL
+        value: https://leads-tracker-api.onrender.com
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
