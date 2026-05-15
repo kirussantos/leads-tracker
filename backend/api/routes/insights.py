@@ -23,6 +23,7 @@ def insights_periodo(
     try:
         account = mc.get_account_insights_periodo(since, until)
         campanhas_raw = mc.get_campaign_insights_periodo(since, until)
+        status_map = mc.get_campaign_statuses()
     except Exception as e:
         return {"erro": str(e)}
 
@@ -47,10 +48,11 @@ def insights_periodo(
         c_verba = float(c.get("spend", 0))
         c_imp = int(c.get("impressions", 0))
         c_cliques = int(c.get("clicks", 0))
+        c_id = c.get("campaign_id", "")
         campanhas_lista.append({
-            "id": c.get("campaign_id", ""),
+            "id": c_id,
             "nome": c.get("campaign_name", ""),
-            "status": "ACTIVE",
+            "status": status_map.get(c_id, "UNKNOWN"),
             "verba": c_verba,
             "impressoes": c_imp,
             "alcance": int(c.get("reach", 0)),

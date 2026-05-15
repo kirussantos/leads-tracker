@@ -121,6 +121,24 @@ export default function Cliente() {
     finally { setSyncing(false); }
   };
 
+  // Pausa / ativa campanha diretamente pelo dash
+  const [campanhasStatus, setCampanhasStatus] = useState({});
+
+  const toggleCampanhaStatus = async (campaignId, novoStatus) => {
+    try {
+      await axios.post(`${API}/meta/campanha/status`, {
+        cliente_id: id,
+        campaign_id: campaignId,
+        status: novoStatus,
+      });
+      // Atualiza localmente sem precisar recarregar
+      setCampanhasStatus(prev => ({ ...prev, [campaignId]: novoStatus }));
+    } catch (e) {
+      console.error("[toggle status]", e);
+      alert(`Erro ao ${novoStatus === "PAUSED" ? "pausar" : "ativar"} campanha.`);
+    }
+  };
+
   const analisarComIA = async () => {
     setShowAnalise(true);
     setLoadingAnalise(true);
@@ -174,16 +192,20 @@ export default function Cliente() {
   );
 
   // Normaliza campos dos dois formatos (Firestore vs Meta API)
-  const campanhasExibidas = (periodoData?.campanhas ?? campsFirestore).map(c => ({
-    id: c.id || c.campaign_id || c.nome,
-    nome: c.nome || c.campaign_name || "—",
-    status: c.status || "ACTIVE",
-    verba_gasta: c.verba ?? c.verba_gasta ?? 0,
-    impressoes: c.impressoes || 0,
-    cliques_whatsapp: c.cliques_wpp ?? c.cliques_whatsapp ?? 0,
-    ctr: c.ctr || 0,
-    cpl_estimado: c.cpl_estimado || 0,
-  }));
+  // campanhasStatus sobrescreve status localmente após toggle
+  const campanhasExibidas = (periodoData?.campanhas ?? campsFirestore).map(c => {
+    const cid = c.id || c.campaign_id || c.nome;
+    return {
+      id: cid,
+      nome: c.nome || c.campaign_name || "—",
+      status: campanhasStatus[cid] ?? c.status ?? "UNKNOWN",
+      verba_gasta: c.verba ?? c.verba_gasta ?? 0,
+      impressoes: c.impressoes || 0,
+      cliques_whatsapp: c.cliques_wpp ?? c.cliques_whatsapp ?? 0,
+      ctr: c.ctr || 0,
+      cpl_estimado: c.cpl_estimado || 0,
+    };
+  });
 
   return (
     <>
@@ -382,7 +404,7 @@ export default function Cliente() {
             </h2>
             <span className="text-[10px] font-mono text-slate-600">{campanhasExibidas.length} encontradas</span>
           </div>
-          <CriativoTable campanhas={campanhasExibidas} />
+          <CriativoTable campanhas={campanhasExibidas} onToggleStatus={toggleCampanhaStatus} />
         </div>
       </div>
     </>

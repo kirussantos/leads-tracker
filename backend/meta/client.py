@@ -54,6 +54,24 @@ class MetaClient:
         })
         return data.get("data", [])
 
+    def _post(self, endpoint: str, data: dict = {}) -> dict:
+        data["access_token"] = self.token
+        resp = requests.post(f"{BASE_URL}/{endpoint}", data=data, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_campaign_statuses(self) -> dict:
+        """Retorna dict {campaign_id: effective_status} para todos as campanhas da conta."""
+        data = self._get(f"{self.ad_account_id}/campaigns", {
+            "fields": "id,effective_status",
+            "limit": 200,
+        })
+        return {c["id"]: c.get("effective_status", "UNKNOWN") for c in data.get("data", [])}
+
+    def update_campaign_status(self, campaign_id: str, status: str) -> dict:
+        """Pausa ou ativa uma campanha. status deve ser 'PAUSED' ou 'ACTIVE'."""
+        return self._post(campaign_id, {"status": status})
+
     def get_adsets(self, campaign_id: str) -> list:
         data = self._get(f"{campaign_id}/adsets", {"fields": "id,name,status", "limit": 100})
         return data.get("data", [])
