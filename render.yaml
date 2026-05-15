@@ -3,6 +3,7 @@ services:
     name: leads-tracker-api
     env: python
     plan: free
+    runtimeVersion: 3.11.0
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
