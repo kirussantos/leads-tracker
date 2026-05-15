@@ -1,9 +1,43 @@
+import json
+import os
+import requests as http_requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from firebase_admin import auth
 from firebase.db import get_db  # garante que o app firebase está inicializado
 
 router = APIRouter(prefix="/setup", tags=["setup"])
+
+SECRET = "feb-setup-2024"
+
+
+def _get_access_token() -> str:
+    """Gera um access token OAuth2 usando o service account do Firebase."""
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request
+
+    creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    credentials.refresh(Request())
+    return credentials.token
+
+
+def _enable_email_password_provider(project_id: str) -> dict:
+    """Ativa Email/Senha como provedor de login via Identity Platform REST API."""
+    token = _get_access_token()
+    url = f"https://identitytoolkit.googleapis.com/admin/v2/projects/{project_id}/config"
+    resp = http_requests.patch(
+        url,
+        json={"signIn": {"email": {"enabled": True, "passwordRequired": True}}},
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        params={"updateMask": "signIn.email.enabled,signIn.email.passwordRequired"},
+        timeout=15,
+    )
+    return resp.json()
 
 
 class CriarAdminRequest(BaseModel):
@@ -14,18 +48,43 @@ class CriarAdminRequest(BaseModel):
 
 @router.post("/criar-admin")
 def criar_admin(body: CriarAdminRequest):
-    """Cria um usuário no Firebase Auth. Endpoint de uso único — protegido por secret."""
-    if body.secret != "feb-setup-2024":
+    """Cria usuário admin e ativa Email/Senha no Firebase Auth."""
+    if body.secret != SECRET:
         raise HTTPException(status_code=403, detail="Secret inválido.")
 
+    # 1. Ativa o provedor Email/Senha
+    try:
+        creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+        project_id = json.loads(creds_json).get("project_id", "leads-tracker-d3d96")
+        provider_result = _enable_email_password_provider(project_id)
+    except Exception as e:
+        provider_result = {"erro_provider": str(e)}
+
+    # 2. Cria (ou confirma existência de) usuário
     try:
         user = auth.create_user(
             email=body.email,
             password=body.password,
             email_verified=True,
         )
-        return {"ok": True, "uid": user.uid, "email": user.email}
+        user_result = {"uid": user.uid, "email": user.email, "novo": True}
     except auth.EmailAlreadyExistsError:
-        return {"ok": True, "info": "Usuário já existe — pode fazer login normalmente."}
+        user_result = {"info": "Usuário já existe.", "novo": False}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao criar usuário: {str(e)}")
+
+    return {"ok": True, "provider": provider_result, "usuario": user_result}
+
+
+@router.post("/ativar-email-provider")
+def ativar_email_provider(secret: str):
+    """Ativa Email/Senha sem criar usuário — endpoint auxiliar."""
+    if secret != SECRET:
+        raise HTTPException(status_code=403, detail="Secret inválido.")
+    try:
+        creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+        project_id = json.loads(creds_json).get("project_id", "leads-tracker-d3d96")
+        result = _enable_email_password_provider(project_id)
+        return {"ok": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
