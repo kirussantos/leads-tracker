@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
-import { Link2, LayoutDashboard, Zap } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link2, LayoutDashboard, Zap, LogOut } from "lucide-react";
 import { clsx } from "clsx";
+import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -9,6 +10,13 @@ const navItems = [
 
 export default function Navbar() {
   const { pathname } = useLocation();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border">
@@ -40,9 +48,20 @@ export default function Navbar() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" />
           <span className="text-xs font-mono text-slate-600">live</span>
+
+          {user && (
+            <button
+              onClick={handleLogout}
+              title={`Sair (${user.email})`}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono text-slate-600 hover:text-red/70 hover:bg-red/5 border border-transparent hover:border-red/15 rounded-lg transition-all"
+            >
+              <LogOut size={12} />
+              Sair
+            </button>
+          )}
         </div>
       </div>
     </nav>
