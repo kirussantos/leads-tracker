@@ -88,3 +88,35 @@ def ativar_email_provider(secret: str):
         return {"ok": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/adicionar-dominio")
+def adicionar_dominio(secret: str, dominio: str):
+    """Adiciona um domínio à lista de authorized domains do Firebase Auth."""
+    if secret != SECRET:
+        raise HTTPException(status_code=403, detail="Secret inválido.")
+    try:
+        creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+        project_id = json.loads(creds_json).get("project_id", "leads-tracker-d3d96")
+        token = _get_access_token()
+        base_url = f"https://identitytoolkit.googleapis.com/admin/v2/projects/{project_id}/config"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+        # Busca domínios atuais
+        current = http_requests.get(base_url, headers=headers, timeout=15).json()
+        existing = current.get("authorizedDomains", [])
+
+        if dominio in existing:
+            return {"ok": True, "info": f"{dominio} já estava na lista.", "dominios": existing}
+
+        updated = existing + [dominio]
+        result = http_requests.patch(
+            base_url,
+            json={"authorizedDomains": updated},
+            headers=headers,
+            params={"updateMask": "authorizedDomains"},
+            timeout=15,
+        ).json()
+        return {"ok": True, "dominios": result.get("authorizedDomains", updated)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
