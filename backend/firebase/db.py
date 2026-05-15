@@ -27,5 +27,5 @@ def doc_to_dict(doc) -> dict:
 
 
 def collection_to_list(query) -> list[dict]:
-    """Converte QuerySnapshot para lista de dicts."""
-    return [doc_to_dict(d) for d in query.stream()]
+    """Converte Query ou StreamGenerator para lista de dicts."""
+    return [doc_to_dict(d) for d in query]

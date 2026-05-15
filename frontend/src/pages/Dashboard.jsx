@@ -1,11 +1,11 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useClientes } from "../hooks/useClientes";
 import { useCampanhas } from "../hooks/useCampanhas";
 import MetricCard from "../components/MetricCard";
 import RevenueChart from "../components/RevenueChart";
 import CriativoTable from "../components/CriativoTable";
-import DateRangePicker from "../components/DateRangePicker";
+import DateRangePicker, { getDefaultRange } from "../components/DateRangePicker";
 import AnaliseModal from "../components/AnaliseModal";
 import {
   DollarSign, Users, MousePointerClick, TrendingUp,
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [loadingAnalise, setLoadingAnalise] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
+  const autoFetchedRef = useRef(false);
 
   // Firestore-based metrics (sync'd data)
   const metricas = useMemo(() => {
@@ -72,6 +73,7 @@ export default function Dashboard() {
         clientes.map(c =>
           axios.get(`${API}/insights/periodo`, {
             params: { cliente_id: c.id, since: range.since, until: range.until },
+            timeout: 65000,
           }).then(r => r.data)
         )
       );
@@ -99,6 +101,14 @@ export default function Dashboard() {
       setLoadingPeriodo(false);
     }
   }, [clientes]);
+
+  // Auto-fetch period once clients are loaded (syncs DateRangePicker default with API)
+  useEffect(() => {
+    if (clientes.length > 0 && !autoFetchedRef.current) {
+      autoFetchedRef.current = true;
+      handleDateChange(getDefaultRange(30), "30 dias");
+    }
+  }, [clientes, handleDateChange]);
 
   // Display data: period API data takes priority over Firestore
   const display = periodoData ? {
