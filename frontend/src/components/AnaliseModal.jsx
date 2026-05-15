@@ -33,7 +33,7 @@ function renderAnalise(text) {
   });
 }
 
-export default function AnaliseModal({ analise, loading, onClose }) {
+export default function AnaliseModal({ analise, loading, onClose, title = "Análise com IA", subtitle = null }) {
   const [copied, setCopied] = useState(false);
 
   function copyText() {
@@ -52,10 +52,15 @@ export default function AnaliseModal({ analise, loading, onClose }) {
       <div className="relative bg-surface border border-border rounded-2xl w-full max-w-2xl max-h-[82vh] flex flex-col shadow-2xl animate-fade-up">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Sparkles size={15} className="text-amber" />
-            <span className="text-sm font-semibold text-slate-200">Análise com IA</span>
-            <span className="text-[10px] font-mono text-slate-600 ml-1">claude-opus-4</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles size={15} className="text-amber flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="text-sm font-semibold text-slate-200">{title}</span>
+              {subtitle && (
+                <p className="text-[10px] font-mono text-slate-500 truncate">{subtitle}</p>
+              )}
+            </div>
+            <span className="text-[10px] font-mono text-slate-600 ml-1 flex-shrink-0">claude-opus-4</span>
           </div>
           <div className="flex items-center gap-2">
             {analise && (
@@ -85,7 +90,7 @@ export default function AnaliseModal({ analise, loading, onClose }) {
                 <div className="absolute inset-0 w-10 h-10 border-2 border-t-amber border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin" />
               </div>
               <div className="flex flex-col items-center gap-1">
-                <p className="text-xs font-mono text-slate-400">Analisando campanhas com IA...</p>
+                <p className="text-xs font-mono text-slate-400">{subtitle ? `Analisando "${subtitle}"...` : "Analisando campanhas com IA..."}</p>
                 <p className="text-[10px] font-mono text-slate-600">Isso pode levar alguns segundos</p>
               </div>
             </div>

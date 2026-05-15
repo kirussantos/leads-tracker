@@ -121,6 +121,29 @@ export default function Cliente() {
     finally { setSyncing(false); }
   };
 
+  // Análise individual de campanha com IA
+  const analisarCampanhaIndividual = async (campanha) => {
+    const resp = await axios.post(`${API}/ai/campanha`, {
+      cliente_nome: cliente?.nome ?? "Cliente",
+      periodo: periodoLabel,
+      campanha: {
+        nome: campanha.nome,
+        status: campanha.status,
+        verba_gasta: campanha.verba_gasta || 0,
+        impressoes: campanha.impressoes || 0,
+        alcance: campanha.alcance || 0,
+        cliques: campanha.cliques || 0,
+        cliques_whatsapp: campanha.cliques_whatsapp || 0,
+        ctr: campanha.ctr || 0,
+        cpl_estimado: campanha.cpl_estimado || 0,
+        frequencia: campanha.frequencia || 0,
+        cpc: campanha.cpc || 0,
+      },
+    });
+    if (resp.data?.erro) throw new Error(resp.data.erro);
+    return resp.data.analise ?? "Erro ao gerar análise.";
+  };
+
   // Pausa / ativa campanha diretamente pelo dash
   const [campanhasStatus, setCampanhasStatus] = useState({});
 
@@ -201,9 +224,13 @@ export default function Cliente() {
       status: campanhasStatus[cid] ?? c.status ?? "UNKNOWN",
       verba_gasta: c.verba ?? c.verba_gasta ?? 0,
       impressoes: c.impressoes || 0,
+      alcance: c.alcance || 0,
+      cliques: c.cliques || 0,
       cliques_whatsapp: c.cliques_wpp ?? c.cliques_whatsapp ?? 0,
       ctr: c.ctr || 0,
       cpl_estimado: c.cpl_estimado || 0,
+      frequencia: c.frequencia || 0,
+      cpc: c.cpc || 0,
     };
   });
 
@@ -404,7 +431,11 @@ export default function Cliente() {
             </h2>
             <span className="text-[10px] font-mono text-slate-600">{campanhasExibidas.length} encontradas</span>
           </div>
-          <CriativoTable campanhas={campanhasExibidas} onToggleStatus={toggleCampanhaStatus} />
+          <CriativoTable
+            campanhas={campanhasExibidas}
+            onToggleStatus={toggleCampanhaStatus}
+            onAnalisarCampanha={analisarCampanhaIndividual}
+          />
         </div>
       </div>
     </>
