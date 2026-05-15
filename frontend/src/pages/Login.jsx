@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { BarChart2, Lock, Mail, Eye, EyeOff, TrendingUp, Zap } from "lucide-react";
@@ -106,8 +106,11 @@ export default function Login() {
   const [fraseIdx, setFraseIdx] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
 
+  // Evita que o useEffect de user navegue enquanto a tela de boas-vindas está ativa
+  const inWelcomeFlow = useRef(false);
+
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
+    if (user && !inWelcomeFlow.current) navigate("/", { replace: true });
   }, [user, navigate]);
 
   useEffect(() => {
@@ -122,16 +125,19 @@ export default function Login() {
     setLoading(true);
     setErro("");
     try {
+      inWelcomeFlow.current = true; // bloqueia navegação automática do useEffect
       await login(email, senha);
-      // Mostra tela de boas-vindas antes de navegar
+      setLoading(false);
       setShowWelcome(true);
     } catch {
+      inWelcomeFlow.current = false;
       setErro(ERROS[Math.floor(Math.random() * ERROS.length)]);
       setLoading(false);
     }
   };
 
   const handleWelcomeDone = () => {
+    inWelcomeFlow.current = false;
     navigate("/", { replace: true });
   };
 
