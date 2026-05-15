@@ -84,16 +84,18 @@ export default function Dashboard() {
         alcance: acc.alcance + (r.alcance || 0),
         cliques_wpp: acc.cliques_wpp + (r.cliques_wpp || 0),
         cliques: acc.cliques + (r.cliques || 0),
+        mensagens_enviadas: acc.mensagens_enviadas + (r.mensagens_enviadas || 0),
         frequencia_media: Math.max(acc.frequencia_media, r.frequencia_media || 0),
         n_campanhas: acc.n_campanhas + (r.n_campanhas || 0),
         campanhas: [...acc.campanhas, ...(r.campanhas || [])],
-      }), { verba: 0, impressoes: 0, alcance: 0, cliques_wpp: 0, cliques: 0, frequencia_media: 0, n_campanhas: 0, campanhas: [] });
+      }), { verba: 0, impressoes: 0, alcance: 0, cliques_wpp: 0, cliques: 0, mensagens_enviadas: 0, frequencia_media: 0, n_campanhas: 0, campanhas: [] });
 
       const cpl = agg.cliques_wpp > 0 ? agg.verba / agg.cliques_wpp : 0;
       const ctr = agg.impressoes > 0 ? (agg.cliques / agg.impressoes) * 100 : 0;
       const cpm = agg.impressoes > 0 ? (agg.verba / agg.impressoes) * 1000 : 0;
 
-      setPeriodoData({ ...agg, cpl_estimado: cpl, ctr_medio: ctr, cpm_medio: cpm });
+      const custo_por_msg = agg.mensagens_enviadas > 0 ? agg.verba / agg.mensagens_enviadas : 0;
+      setPeriodoData({ ...agg, cpl_estimado: cpl, ctr_medio: ctr, cpm_medio: cpm, custo_por_mensagem: custo_por_msg });
     } catch (e) {
       console.error("[insights/periodo]", e);
       setPeriodoErro(true);
@@ -116,6 +118,8 @@ export default function Dashboard() {
     impressoes: periodoData.impressoes,
     alcance: periodoData.alcance,
     cliques_wpp: periodoData.cliques_wpp,
+    mensagens_enviadas: periodoData.mensagens_enviadas || 0,
+    custo_por_mensagem: periodoData.custo_por_mensagem || 0,
     cpl_medio: periodoData.cpl_estimado,
     ctr_medio: periodoData.ctr_medio,
     cpm_medio: periodoData.cpm_medio,
@@ -123,6 +127,8 @@ export default function Dashboard() {
     n_campanhas: periodoData.n_campanhas,
   } : {
     ...firestoreTotais,
+    mensagens_enviadas: 0,
+    custo_por_mensagem: 0,
     n_campanhas: campanhas.length,
   };
 
@@ -273,7 +279,7 @@ export default function Dashboard() {
         {/* Métricas Estendidas */}
         <div>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">Alcance & Engajamento</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <MetricCard
               title="Impressões"
               value={fmtNum(display.impressoes)}
@@ -305,6 +311,22 @@ export default function Dashboard() {
               color="default"
               icon={BarChart2}
               delay={240}
+            />
+            <MetricCard
+              title="Mensagens Enviadas"
+              value={display.mensagens_enviadas > 0 ? fmtNum(display.mensagens_enviadas) : "—"}
+              subtitle="conversas iniciadas"
+              color={display.mensagens_enviadas > 0 ? "green" : "default"}
+              icon={MousePointerClick}
+              delay={320}
+            />
+            <MetricCard
+              title="Custo por Mensagem"
+              value={display.custo_por_mensagem > 0 ? `R$${display.custo_por_mensagem.toFixed(2)}` : "—"}
+              subtitle="spend / conversa"
+              color={display.custo_por_mensagem > 0 && display.custo_por_mensagem < 15 ? "green" : display.custo_por_mensagem < 30 ? "amber" : "default"}
+              icon={TrendingUp}
+              delay={400}
             />
           </div>
         </div>

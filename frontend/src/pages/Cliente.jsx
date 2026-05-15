@@ -93,6 +93,8 @@ export default function Cliente() {
     alcance: periodoData.alcance || 0,
     cliques_wpp: periodoData.cliques_wpp || 0,
     cliques: periodoData.cliques || 0,
+    mensagens_enviadas: periodoData.mensagens_enviadas || 0,
+    custo_por_mensagem: periodoData.custo_por_mensagem || 0,
     cpl: periodoData.cpl_estimado || 0,
     ctr: periodoData.ctr_medio || 0,
     cpm: periodoData.cpm || 0,
@@ -104,6 +106,8 @@ export default function Cliente() {
     alcance: 0,
     cliques_wpp: wppFirestore,
     cliques: cliquesFirestore,
+    mensagens_enviadas: 0,
+    custo_por_mensagem: 0,
     cpl: cplFirestore,
     ctr: ctrFirestore,
     cpm: cpmFirestore,
@@ -277,7 +281,7 @@ export default function Cliente() {
         {/* Alcance & Engajamento */}
         <div>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">Alcance & Engajamento</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <MetricCard
               title="Impressões"
               value={fmtNum(display.impressoes)}
@@ -309,6 +313,22 @@ export default function Cliente() {
               color="default"
               icon={BarChart2}
               delay={240}
+            />
+            <MetricCard
+              title="Mensagens Enviadas"
+              value={display.mensagens_enviadas > 0 ? fmtNum(display.mensagens_enviadas) : "—"}
+              subtitle="conversas iniciadas"
+              color={display.mensagens_enviadas > 0 ? "green" : "default"}
+              icon={MousePointerClick}
+              delay={320}
+            />
+            <MetricCard
+              title="Custo por Mensagem"
+              value={display.custo_por_mensagem > 0 ? `R$${display.custo_por_mensagem.toFixed(2)}` : "—"}
+              subtitle="spend / conversa"
+              color={display.custo_por_mensagem > 0 && display.custo_por_mensagem < 15 ? "green" : display.custo_por_mensagem < 30 ? "amber" : "default"}
+              icon={TrendingUp}
+              delay={400}
             />
           </div>
         </div>

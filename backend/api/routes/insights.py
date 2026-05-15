@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 from firebase.db import get_db
 from meta.client import MetaClient
-from meta.insights import _cliques_whatsapp
+from meta.insights import _cliques_whatsapp, _mensagens_enviadas
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -28,6 +28,7 @@ def insights_periodo(
 
     actions = account.get("actions", [])
     total_wpp = _cliques_whatsapp(actions)
+    total_msgs = _mensagens_enviadas(actions)
     total_verba = float(account.get("spend", 0))
     total_impressoes = int(account.get("impressions", 0))
     total_alcance = int(account.get("reach", 0))
@@ -37,6 +38,7 @@ def insights_periodo(
     cpl = total_verba / total_wpp if total_wpp > 0 else 0
     ctr = (total_cliques / total_impressoes * 100) if total_impressoes > 0 else 0
     cpm = (total_verba / total_impressoes * 1000) if total_impressoes > 0 else 0
+    custo_por_msg = total_verba / total_msgs if total_msgs > 0 else 0
 
     campanhas_lista = []
     for c in campanhas_raw:
@@ -68,6 +70,8 @@ def insights_periodo(
         "alcance": total_alcance,
         "cliques": total_cliques,
         "cliques_wpp": total_wpp,
+        "mensagens_enviadas": total_msgs,
+        "custo_por_mensagem": custo_por_msg,
         "ctr_medio": ctr,
         "cpm": cpm,
         "cpl_estimado": cpl,

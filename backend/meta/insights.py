@@ -14,6 +14,17 @@ def _cliques_whatsapp(actions: list) -> int:
     return 0
 
 
+def _mensagens_enviadas(actions: list) -> int:
+    """Conversas iniciadas via anúncio (messaging_conversation_started_7d)."""
+    for a in actions or []:
+        if a.get("action_type") in [
+            "onsite_conversion.messaging_conversation_started_7d",
+            "messaging_conversation_started_7d",
+        ]:
+            return int(a.get("value", 0))
+    return 0
+
+
 def sincronizar_cliente(cliente_id: str, cliente_data: dict) -> int:
     """Sincroniza cliente com Meta API e grava no Firestore. Retorna qtd de registros."""
     db = get_db()
