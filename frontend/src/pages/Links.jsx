@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import axios from "axios";
 import { Link2, Copy, Check } from "lucide-react";
 
-const API = import.meta.env.VITE_API_URL;
+const API = (import.meta.env.VITE_API_URL || "").replace(/^﻿/, "").trim();
 
 export default function Links() {
   const { clientes } = useClientes();
