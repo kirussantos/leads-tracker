@@ -55,7 +55,12 @@ export default function Cliente() {
         params: { cliente_id: id, since: range.since, until: range.until },
         timeout: 65000,
       });
-      setPeriodoData(r.data);
+      if (r.data?.erro) {
+        console.error("[insights/periodo] erro backend:", r.data.erro);
+        setPeriodoErro(true);
+      } else {
+        setPeriodoData(r.data);
+      }
     } catch (e) {
       console.error("[insights/periodo]", e);
       setPeriodoErro(true);
@@ -83,16 +88,16 @@ export default function Cliente() {
 
   // Exibe dados do período se disponível, senão Firestore
   const display = periodoData ? {
-    verba: periodoData.verba,
-    impressoes: periodoData.impressoes,
-    alcance: periodoData.alcance,
-    cliques_wpp: periodoData.cliques_wpp,
-    cliques: periodoData.cliques,
-    cpl: periodoData.cpl_estimado,
-    ctr: periodoData.ctr_medio,
-    cpm: periodoData.cpm,
-    frequencia: periodoData.frequencia_media,
-    n_campanhas: periodoData.n_campanhas,
+    verba: periodoData.verba || 0,
+    impressoes: periodoData.impressoes || 0,
+    alcance: periodoData.alcance || 0,
+    cliques_wpp: periodoData.cliques_wpp || 0,
+    cliques: periodoData.cliques || 0,
+    cpl: periodoData.cpl_estimado || 0,
+    ctr: periodoData.ctr_medio || 0,
+    cpm: periodoData.cpm || 0,
+    frequencia: periodoData.frequencia_media || 0,
+    n_campanhas: periodoData.n_campanhas || 0,
   } : {
     verba: verbaFirestore,
     impressoes: impressoesFirestore,
