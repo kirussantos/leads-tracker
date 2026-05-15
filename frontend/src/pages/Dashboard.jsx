@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [periodoData, setPeriodoData] = useState(null);
   const [loadingPeriodo, setLoadingPeriodo] = useState(false);
   const [periodoLabel, setPeriodoLabel] = useState("30 dias");
+  const [periodoErro, setPeriodoErro] = useState(false);
 
   const [showAnalise, setShowAnalise] = useState(false);
   const [analise, setAnalise] = useState(null);
@@ -64,7 +65,7 @@ export default function Dashboard() {
     setPeriodoLabel(label);
     if (!clientes.length) return;
     setLoadingPeriodo(true);
-    setPeriodoData(null);
+    setPeriodoErro(false);
 
     try {
       const results = await Promise.all(
@@ -93,6 +94,7 @@ export default function Dashboard() {
       setPeriodoData({ ...agg, cpl_estimado: cpl, ctr_medio: ctr, cpm_medio: cpm });
     } catch (e) {
       console.error("[insights/periodo]", e);
+      setPeriodoErro(true);
     } finally {
       setLoadingPeriodo(false);
     }
@@ -209,8 +211,14 @@ export default function Dashboard() {
         </div>
 
         {/* Date Range Picker */}
-        <div className="bg-card border border-border rounded-xl px-4 py-3">
+        <div className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col gap-2">
           <DateRangePicker onChange={handleDateChange} loading={loadingPeriodo} />
+          {periodoErro && (
+            <p className="text-[10px] font-mono text-red/70 mt-1">
+              ⚠ Não foi possível buscar dados do período — exibindo dados do último sync.
+              O backend pode estar iniciando (aguarde ~30s e tente novamente).
+            </p>
+          )}
         </div>
 
         {/* Métricas Principais */}
