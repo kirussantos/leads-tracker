@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { useCampanhas } from "../hooks/useCampanhas";
 import MetricCard from "../components/MetricCard";
 import CriativoTable from "../components/CriativoTable";
+import CampanhaEditModal from "../components/CampanhaEditModal";
 import DateRangePicker, { getDefaultRange } from "../components/DateRangePicker";
 import AnaliseModal from "../components/AnaliseModal";
 import {
@@ -132,6 +133,9 @@ export default function Cliente() {
 
   const [campanhasStatus, setCampanhasStatus] = useState({});
 
+  // ── Campaign edit modal ──────────────────────────────────────────────────────
+  const [editingCampanha, setEditingCampanha] = useState(null);
+
   const toggleCampanhaStatus = async (campaignId, novoStatus) => {
     try {
       await axios.post(`${API}/meta/campanha/status`, {
@@ -152,6 +156,31 @@ export default function Cliente() {
       const msg = err?.response?.data?.detail || "Erro ao atualizar orçamento.";
       alert(msg);
       throw err;
+    }
+  };
+
+  const salvarEdicaoCampanha = async ({ campaignId, nome, status, budget }) => {
+    const promises = [];
+    if (nome) {
+      promises.push(
+        axios.post(`${API}/meta/campanha/nome`, { cliente_id: id, campaign_id: campaignId, nome }),
+      );
+    }
+    if (status) {
+      promises.push(
+        axios.post(`${API}/meta/campanha/status`, { cliente_id: id, campaign_id: campaignId, status }),
+      );
+    }
+    if (budget) {
+      promises.push(
+        axios.post(`${API}/meta/campanha/budget`, { cliente_id: id, campaign_id: campaignId, daily_budget: budget }),
+      );
+    }
+    // Run all in parallel — throws if any fail
+    await Promise.all(promises);
+    // Reflect status change locally without re-fetch
+    if (status) {
+      setCampanhasStatus(prev => ({ ...prev, [campaignId]: status }));
     }
   };
 
@@ -220,6 +249,14 @@ export default function Cliente() {
     <>
       {showAnalise && (
         <AnaliseModal analise={analise} loading={loadingAnalise} onClose={() => setShowAnalise(false)} />
+      )}
+
+      {editingCampanha && (
+        <CampanhaEditModal
+          campanha={editingCampanha}
+          onClose={() => setEditingCampanha(null)}
+          onSave={salvarEdicaoCampanha}
+        />
       )}
 
       <div className="space-y-7">
@@ -445,6 +482,7 @@ export default function Cliente() {
               onToggleStatus={toggleCampanhaStatus}
               onAnalisarCampanha={analisarCampanhaIndividual}
               onUpdateBudget={updateCampanhaBudget}
+              onEditCampanha={setEditingCampanha}
             />
           </div>
         </div>

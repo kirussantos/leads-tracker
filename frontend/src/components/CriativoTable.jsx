@@ -152,7 +152,7 @@ function CtrBar({ ctr }) {
   );
 }
 
-export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalisarCampanha, onUpdateBudget }) {
+export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalisarCampanha, onUpdateBudget, onEditCampanha }) {
   const [analiseState, setAnaliseState] = useState({ show: false, loading: false, analise: null, campanhaNome: null });
 
   const handleAnalisar = async (campanha) => {
@@ -180,8 +180,9 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
   const hasToggle  = typeof onToggleStatus    === "function";
   const hasAnalise = typeof onAnalisarCampanha === "function";
   const hasBudget  = typeof onUpdateBudget     === "function";
+  const hasEdit    = typeof onEditCampanha     === "function";
 
-  const actionsCount = [hasToggle, hasAnalise, hasBudget].filter(Boolean).length;
+  const actionsCount = [hasToggle, hasAnalise, hasBudget, hasEdit].filter(Boolean).length;
 
   return (
     <>
@@ -285,6 +286,18 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                         currentBudget={ad.daily_budget || 0}
                         onUpdateBudget={onUpdateBudget}
                       />
+                    )}
+                    {hasEdit && (
+                      <button
+                        onClick={() => onEditCampanha(ad)}
+                        title="Editar campanha"
+                        className={clsx(
+                          "flex items-center justify-center w-8 h-8 rounded-xl border transition-all active:scale-95",
+                          "border-border text-slate-600 hover:text-cyan hover:border-cyan/30 hover:bg-cyan/[0.06]",
+                        )}
+                      >
+                        <Pencil size={12} />
+                      </button>
                     )}
                     {hasToggle && (
                       <ToggleBtn

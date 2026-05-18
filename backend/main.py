@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from scheduler.jobs import iniciar_scheduler
 from meta.insights import sincronizar_todos
-from api.routes import clientes, links, leads, sync, insights, ai, meta, setup
+from api.routes import clientes, links, leads, sync, insights, ai, meta, setup, alertas
 
 app = FastAPI(title="Leads Tracker API")
 
@@ -21,6 +21,7 @@ app.include_router(insights.router)
 app.include_router(ai.router)
 app.include_router(meta.router)
 app.include_router(setup.router)
+app.include_router(alertas.router)
 
 
 @app.on_event("startup")
