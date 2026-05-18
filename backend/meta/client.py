@@ -1,8 +1,10 @@
 import json
 import requests
-from config import META_API_VERSION
 
-BASE_URL = f"https://graph.facebook.com/{META_API_VERSION}"
+# Meta Graph API version — hardcoded to avoid env var overrides on legacy deploys
+# v19.0 was deprecated in 2024; v22.0 is the current stable version (2026)
+_META_API_VERSION = "v22.0"
+BASE_URL = f"https://graph.facebook.com/{_META_API_VERSION}"
 
 _INSIGHT_FIELDS = "impressions,reach,clicks,spend,ctr,cpc,frequency,actions,cost_per_action_type"
 
