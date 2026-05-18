@@ -6,6 +6,7 @@ Env vars needed:
                        Gerar em: myaccount.google.com/apppasswords
 """
 import smtplib
+import socket
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -25,8 +26,12 @@ def enviar_email(destinatario: str, assunto: str, html: str) -> bool:
         msg["To"]      = destinatario
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+        # Forçar IPv4 — Render free tier não tem rota IPv6 para SMTP
+        smtp_ip = socket.getaddrinfo("smtp.gmail.com", 587, socket.AF_INET)[0][4][0]
+        with smtplib.SMTP(smtp_ip, 587, timeout=20) as server:
+            server.ehlo("smtp.gmail.com")
             server.starttls()
+            server.ehlo("smtp.gmail.com")
             server.login(GMAIL_USER, GMAIL_PASSWORD)
             server.sendmail(GMAIL_USER, destinatario, msg.as_string())
         print(f"[EMAIL] ✓ Enviado para {destinatario}: {assunto}")
