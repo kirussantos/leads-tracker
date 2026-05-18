@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from alertas.checker import verificar_todos_clientes, verificar_e_alertar_cliente
-from email.sender import enviar_email
-from email.templates import template_alerta_campanhas
+from mail.sender import enviar_email
+from mail.templates import template_alerta_campanhas
 from firebase.db import get_db
 
 router = APIRouter(prefix="/alertas", tags=["alertas"])

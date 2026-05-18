@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 from firebase.db import get_db
 from meta.client import MetaClient
 from meta.insights import _cliques_whatsapp
-from email.sender import enviar_para_lista
-from email.templates import template_alerta_campanhas
+from mail.sender import enviar_para_lista
+from mail.templates import template_alerta_campanhas
 import json
 
 CPL_MAX   = float(os.getenv("ALERTA_CPL_MAX",   "30"))
