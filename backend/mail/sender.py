@@ -25,7 +25,8 @@ def enviar_email(destinatario: str, assunto: str, html: str) -> bool:
         msg["To"]      = destinatario
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.starttls()
             server.login(GMAIL_USER, GMAIL_PASSWORD)
             server.sendmail(GMAIL_USER, destinatario, msg.as_string())
         print(f"[EMAIL] ✓ Enviado para {destinatario}: {assunto}")
