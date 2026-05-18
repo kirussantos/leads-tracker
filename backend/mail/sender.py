@@ -1,39 +1,36 @@
 """
-Email sender using Gmail SMTP (App Password).
-Env vars needed:
-  GMAIL_USER         → seu email Gmail (ex: elber@gmail.com)
-  GMAIL_APP_PASSWORD → App Password do Google (não a senha normal)
-                       Gerar em: myaccount.google.com/apppasswords
+Email sender usando Resend API (HTTP — sem SMTP, funciona no Render free tier).
+Env vars necessárias:
+  RESEND_API_KEY → chave da API em resend.com (gratuito: 3.000 emails/mês)
+  GMAIL_USER     → endereço exibido como remetente (ex: elberagenciamkt@gmail.com)
+                   Nota: no plano free do Resend o "from" precisa ser onboarding@resend.dev
+                   ou um domínio verificado. GMAIL_USER é usado como "reply-to".
 """
-import smtplib
-import socket
 import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 
-GMAIL_USER     = os.getenv("GMAIL_USER", "")
-GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+GMAIL_USER     = os.getenv("GMAIL_USER", "elberagenciamkt@gmail.com")
+
+
+def _get_from() -> str:
+    """Retorna o endereço remetente válido para o Resend."""
+    return "Leads Tracker <onboarding@resend.dev>"
 
 
 def enviar_email(destinatario: str, assunto: str, html: str) -> bool:
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        print(f"[EMAIL] Credenciais não configuradas — email não enviado para {destinatario}")
+    if not RESEND_API_KEY:
+        print(f"[EMAIL] RESEND_API_KEY não configurada — email não enviado para {destinatario}")
         return False
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = assunto
-        msg["From"]    = f"Leads Tracker <{GMAIL_USER}>"
-        msg["To"]      = destinatario
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        # Forçar IPv4 — Render free tier não tem rota IPv6 para SMTP
-        smtp_ip = socket.getaddrinfo("smtp.gmail.com", 587, socket.AF_INET)[0][4][0]
-        with smtplib.SMTP(smtp_ip, 587, timeout=20) as server:
-            server.ehlo("smtp.gmail.com")
-            server.starttls()
-            server.ehlo("smtp.gmail.com")
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, destinatario, msg.as_string())
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from":     _get_from(),
+            "to":       [destinatario],
+            "reply_to": GMAIL_USER,
+            "subject":  assunto,
+            "html":     html,
+        })
         print(f"[EMAIL] ✓ Enviado para {destinatario}: {assunto}")
         return True
     except Exception as e:
