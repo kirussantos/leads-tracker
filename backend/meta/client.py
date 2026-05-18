@@ -72,6 +72,32 @@ class MetaClient:
         """Pausa ou ativa uma campanha. status deve ser 'PAUSED' ou 'ACTIVE'."""
         return self._post(campaign_id, {"status": status})
 
+    def update_campaign_budget(self, campaign_id: str, daily_budget_cents: int) -> dict:
+        """Atualiza o orçamento diário de uma campanha. Valor em centavos (ex: 5000 = R$50,00)."""
+        return self._post(campaign_id, {"daily_budget": daily_budget_cents})
+
+    def update_campaign_name(self, campaign_id: str, name: str) -> dict:
+        """Renomeia uma campanha."""
+        return self._post(campaign_id, {"name": name})
+
+    def get_campaign_details(self, campaign_id: str) -> dict:
+        """Retorna detalhes completos de uma campanha incluindo orçamento."""
+        data = self._get(campaign_id, {
+            "fields": "id,name,status,effective_status,daily_budget,lifetime_budget,budget_remaining,objective",
+        })
+        return data
+
+    def get_adset_details(self, adset_id: str) -> dict:
+        """Retorna detalhes de um adset incluindo targeting e orçamento."""
+        data = self._get(adset_id, {
+            "fields": "id,name,status,effective_status,daily_budget,lifetime_budget,targeting,bid_amount,optimization_goal",
+        })
+        return data
+
+    def update_adset_budget(self, adset_id: str, daily_budget_cents: int) -> dict:
+        """Atualiza o orçamento diário de um adset. Valor em centavos."""
+        return self._post(adset_id, {"daily_budget": daily_budget_cents})
+
     def get_adsets(self, campaign_id: str) -> list:
         data = self._get(f"{campaign_id}/adsets", {"fields": "id,name,status", "limit": 100})
         return data.get("data", [])
