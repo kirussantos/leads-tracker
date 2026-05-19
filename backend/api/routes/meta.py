@@ -275,3 +275,104 @@ def detalhes_adset(cliente_id: str, adset_id: str):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Erro Meta API: {str(e)}")
     return data
+
+
+# ─── Saldo & Criativos ────────────────────────────────────────────────────────
+
+@router.get("/conta/saldo")
+def get_conta_saldo(cliente_id: str):
+    """Retorna saldo prepago e metadados da conta de anúncios."""
+    db = get_db()
+    doc = db.collection("clientes").document(cliente_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    cliente = doc.to_dict()
+    mc = MetaClient(cliente["meta_token"], cliente["ad_account_id"])
+    try:
+        info = mc.get_account_info()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro Meta API: {str(e)}")
+
+    # Meta retorna valores em centavos da moeda local (BRL centavos → ÷ 100)
+    divisor = 100
+    balance       = int(info.get("balance",       0)) / divisor
+    amount_spent  = int(info.get("amount_spent",  0)) / divisor
+    spend_cap_raw = info.get("spend_cap")
+    spend_cap     = int(spend_cap_raw) / divisor if spend_cap_raw and str(spend_cap_raw) != "0" else None
+
+    return {
+        "cliente_id":   cliente_id,
+        "nome":         cliente.get("nome", "—"),
+        "ad_account_id": cliente.get("ad_account_id", "—"),
+        "currency":     info.get("currency", "BRL"),
+        "balance":      balance,
+        "amount_spent": amount_spent,
+        "spend_cap":    spend_cap,
+    }
+
+
+@router.get("/conta/criativos")
+def get_criativos_periodo(cliente_id: str, since: str, until: str):
+    """Retorna os melhores anúncios do período com métricas e preview do criativo."""
+    mc = _get_meta_client(cliente_id)
+    try:
+        insights      = mc.get_ad_insights_periodo(since, until)
+        creative_list = mc.get_ads_creative_info()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro Meta API: {str(e)}")
+
+    # Mapa ad_id → urls do criativo
+    creative_map: dict = {}
+    for ad in creative_list:
+        creative = ad.get("creative") or {}
+        creative_map[ad["id"]] = {
+            "thumbnail_url": creative.get("thumbnail_url"),
+            "image_url":     creative.get("image_url"),
+        }
+
+    result = []
+    for row in insights:
+        ad_id       = row.get("ad_id", "")
+        spend       = float(row.get("spend", 0))
+        impressions = int(row.get("impressions", 0))
+        clicks      = int(row.get("clicks", 0))
+        actions     = row.get("actions") or []
+
+        # Cliques WhatsApp: abarca os principais tipos de evento
+        wpp_clicks = sum(
+            int(a.get("value", 0))
+            for a in actions
+            if any(kw in a.get("action_type", "")
+                   for kw in ("whatsapp", "messaging_conversation", "click_to_call"))
+        )
+
+        ctr       = float(row.get("ctr",       0))
+        cpc       = float(row.get("cpc",       0))
+        frequency = float(row.get("frequency", 0))
+        cpl       = spend / wpp_clicks if wpp_clicks > 0 else None
+        cpm       = (spend / impressions * 1000) if impressions > 0 else 0.0
+
+        creative = creative_map.get(ad_id, {})
+        result.append({
+            "ad_id":         ad_id,
+            "ad_name":       row.get("ad_name",       "—"),
+            "adset_id":      row.get("adset_id",      ""),
+            "adset_name":    row.get("adset_name",    "—"),
+            "campaign_id":   row.get("campaign_id",   ""),
+            "campaign_name": row.get("campaign_name", "—"),
+            "spend":         spend,
+            "impressions":   impressions,
+            "clicks":        clicks,
+            "wpp_clicks":    wpp_clicks,
+            "ctr":           ctr,
+            "cpc":           cpc,
+            "cpl":           cpl,
+            "cpm":           cpm,
+            "frequency":     frequency,
+            "thumbnail_url": creative.get("thumbnail_url"),
+            "image_url":     creative.get("image_url"),
+        })
+
+    # Ordena por leads WPP desc, depois spend desc
+    result.sort(key=lambda x: (-x["wpp_clicks"], -x["spend"]))
+    return result[:50]

@@ -8,6 +8,7 @@ import CriativoTable from "../components/CriativoTable";
 import CampanhaEditModal from "../components/CampanhaEditModal";
 import DateRangePicker, { getDefaultRange } from "../components/DateRangePicker";
 import AnaliseModal from "../components/AnaliseModal";
+import MelhoresCreativos from "../components/MelhoresCreativos";
 import {
   DollarSign, MousePointerClick, TrendingUp, RefreshCw,
   Eye, Users, Activity, BarChart2, ArrowLeft, Sparkles, AlertCircle, Wifi,
@@ -41,9 +42,13 @@ export default function Cliente() {
 
   const [periodoData,    setPeriodoData]    = useState(null);
   const [periodoLabel,   setPeriodoLabel]   = useState("30 dias");
+  const [periodoRange,   setPeriodoRange]   = useState(getDefaultRange(30));
   const [loadingPeriodo, setLoadingPeriodo] = useState(false);
   const [periodoErro,    setPeriodoErro]    = useState(false);
   const autoFetchedRef = useRef(false);
+
+  const [criativosMeta,    setCriativosMeta]    = useState([]);
+  const [loadingCriativos, setLoadingCriativos] = useState(false);
 
   const [showAnalise,    setShowAnalise]    = useState(false);
   const [analise,        setAnalise]        = useState(null);
@@ -62,8 +67,24 @@ export default function Cliente() {
 
   const handleDateChange = useCallback(async (range, label) => {
     setPeriodoLabel(label);
+    setPeriodoRange(range);
     setLoadingPeriodo(true);
     setPeriodoErro(false);
+
+    // Busca criativos em paralelo (não bloqueia o fetch de período)
+    setLoadingCriativos(true);
+    setCriativosMeta([]);
+    axios.get(`${API}/meta/conta/criativos`, {
+      params: { cliente_id: id, since: range.since, until: range.until },
+      timeout: 35000,
+    }).then(r => {
+      setCriativosMeta(r.data || []);
+    }).catch(() => {
+      setCriativosMeta([]);
+    }).finally(() => {
+      setLoadingCriativos(false);
+    });
+
     try {
       const r = await axios.get(`${API}/insights/periodo`, {
         params: { cliente_id: id, since: range.since, until: range.until },
@@ -625,6 +646,22 @@ export default function Cliente() {
             />
           </div>
         </div>
+
+        {/* ── Melhores Criativos ── */}
+        {(loadingCriativos || criativosMeta.length > 0) && (
+          <div>
+            <SectionDivider
+              label="Melhores Criativos"
+              description={`Top anúncios por performance no período — ${periodoLabel} · ordenados por leads WPP e gasto`}
+            />
+            <div className="mt-4">
+              <MelhoresCreativos
+                criativos={criativosMeta}
+                loading={loadingCriativos}
+              />
+            </div>
+          </div>
+        )}
 
       </div>
     </>

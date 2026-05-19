@@ -9,6 +9,7 @@ import DateRangePicker, { getDefaultRange } from "../components/DateRangePicker"
 import AnaliseModal from "../components/AnaliseModal";
 import MuralDaVergonha from "../components/MuralDaVergonha";
 import HallDosMelhores from "../components/HallDosMelhores";
+import SaldoContas from "../components/SaldoContas";
 import {
   DollarSign, Users, MousePointerClick, TrendingUp,
   ArrowRight, RefreshCw, Eye, Sparkles, BarChart2, Activity,
@@ -41,7 +42,11 @@ export default function Dashboard() {
   const [periodoData,    setPeriodoData]    = useState(null);
   const [loadingPeriodo, setLoadingPeriodo] = useState(false);
   const [periodoLabel,   setPeriodoLabel]   = useState("30 dias");
+  const [periodoRange,   setPeriodoRange]   = useState(getDefaultRange(30));
   const [periodoErro,    setPeriodoErro]    = useState(false);
+
+  const [saldos,        setSaldos]        = useState([]);
+  const [loadingSaldos, setLoadingSaldos] = useState(false);
 
   const [showAnalise,    setShowAnalise]    = useState(false);
   const [analise,        setAnalise]        = useState(null);
@@ -78,9 +83,24 @@ export default function Dashboard() {
 
   const handleDateChange = useCallback(async (range, label) => {
     setPeriodoLabel(label);
+    setPeriodoRange(range);
     if (!clientes.length) return;
     setLoadingPeriodo(true);
     setPeriodoErro(false);
+
+    // Busca saldos em paralelo (não bloqueia o fetch de período)
+    setLoadingSaldos(true);
+    Promise.all(
+      clientes.map(c =>
+        axios.get(`${API}/meta/conta/saldo`, { params: { cliente_id: c.id }, timeout: 20000 })
+          .then(r => ({ ...r.data, cliente_id: c.id }))
+          .catch(() => null)
+      )
+    ).then(results => {
+      setSaldos(results.filter(Boolean));
+      setLoadingSaldos(false);
+    });
+
     try {
       const results = await Promise.all(
         clientes.map(c =>
@@ -507,6 +527,24 @@ export default function Dashboard() {
           </div>
 
         </div>
+
+        {/* ── Fôlego das Contas ── */}
+        {(loadingSaldos || saldos.length > 0) && (
+          <div>
+            <SectionDivider
+              label="Fôlego das Contas"
+              description="Saldo prepago restante e estimativa de duração com base no ritmo atual de gasto"
+            />
+            <div className="mt-4">
+              <SaldoContas
+                saldos={saldos}
+                loading={loadingSaldos}
+                periodoData={periodoData}
+                periodoRange={periodoRange}
+              />
+            </div>
+          </div>
+        )}
 
         {/* ── Por Cliente ── */}
         <div>

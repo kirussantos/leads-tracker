@@ -128,3 +128,32 @@ class MetaClient:
         if "targeting" in post_data and isinstance(post_data["targeting"], dict):
             post_data["targeting"] = _json.dumps(post_data["targeting"])
         return self._post(adset_id, post_data)
+
+    # ── Saldo e Criativos ─────────────────────────────────────────────────────
+
+    def get_account_info(self) -> dict:
+        """Retorna saldo prepago, spend e metadados da conta de anúncios."""
+        return self._get(self.ad_account_id, {
+            "fields": "balance,amount_spent,spend_cap,currency,name",
+        })
+
+    def get_ad_insights_periodo(self, since: str, until: str) -> list:
+        """Insights por anúncio (ad-level) para um período específico."""
+        data = self._get(f"{self.ad_account_id}/insights", {
+            "fields": (
+                "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,"
+                "impressions,clicks,spend,ctr,cpc,frequency,actions"
+            ),
+            "time_range": json.dumps({"since": since, "until": until}),
+            "level": "ad",
+            "limit": 200,
+        })
+        return data.get("data", [])
+
+    def get_ads_creative_info(self) -> list:
+        """Retorna ads com thumbnail/imagem do criativo."""
+        data = self._get(f"{self.ad_account_id}/ads", {
+            "fields": "id,name,status,creative{thumbnail_url,image_url}",
+            "limit": 200,
+        })
+        return data.get("data", [])
