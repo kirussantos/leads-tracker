@@ -11,6 +11,7 @@ import AnaliseModal from "../components/AnaliseModal";
 import {
   DollarSign, MousePointerClick, TrendingUp, RefreshCw,
   Eye, Users, Activity, BarChart2, ArrowLeft, Sparkles, AlertCircle, Wifi,
+  Pause, Loader,
 } from "lucide-react";
 import { clsx } from "clsx";
 import axios from "axios";
@@ -49,6 +50,8 @@ export default function Cliente() {
   const [loadingAnalise, setLoadingAnalise] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
+  const [vampireDismissed, setVampireDismissed] = useState(false);
+  const [pausingVampires,  setPausingVampires]  = useState(false);
 
   useEffect(() => {
     getDoc(doc(db, "clientes", id)).then(d => {
@@ -115,7 +118,7 @@ export default function Cliente() {
     finally { setSyncing(false); }
   };
 
-  const analisarCampanhaIndividual = async (campanha) => {
+  const analisarCampanhaIndividual = async (campanha, saturacao = null) => {
     const resp = await axios.post(`${API}/ai/campanha`, {
       cliente_nome: cliente?.nome ?? "Cliente",
       periodo: periodoLabel,
@@ -126,6 +129,10 @@ export default function Cliente() {
         cliques_whatsapp: campanha.cliques_whatsapp || 0, ctr: campanha.ctr || 0,
         cpl_estimado: campanha.cpl_estimado || 0, frequencia: campanha.frequencia || 0, cpc: campanha.cpc || 0,
       },
+      // Passa alerta de saturação para o Claude enfocar no diagnóstico correto
+      saturacao: saturacao && ["critical", "warning"].includes(saturacao.nivel)
+        ? { nivel: saturacao.nivel, hint: saturacao.hint }
+        : null,
     });
     if (resp.data?.erro) throw new Error(resp.data.erro);
     return resp.data.analise ?? "Erro ao gerar análise.";
@@ -156,6 +163,35 @@ export default function Cliente() {
       const msg = err?.response?.data?.detail || "Erro ao atualizar orçamento.";
       alert(msg);
       throw err;
+    }
+  };
+
+  // ── Vampiros de Orçamento ─────────────────────────────────────────────────
+  // Campanhas que gastaram verba no período sem gerar nenhum lead WhatsApp.
+  // Só ativo para períodos >= 3 dias.
+  const periodoMinDias = (() => {
+    if (!periodoLabel) return 7;
+    const n = parseInt(periodoLabel);
+    return isNaN(n) ? 7 : n;
+  })();
+
+  const pausarVampires = async (campanhas) => {
+    setPausingVampires(true);
+    try {
+      await Promise.all(
+        campanhas.map(c =>
+          axios.post(`${API}/meta/campanha/status`, {
+            cliente_id: id,
+            campaign_id: c.id,
+            status: "PAUSED",
+          }).then(() => {
+            setCampanhasStatus(prev => ({ ...prev, [c.id]: "PAUSED" }));
+          }),
+        ),
+      );
+      setVampireDismissed(true);
+    } finally {
+      setPausingVampires(false);
     }
   };
 
@@ -459,8 +495,70 @@ export default function Cliente() {
         <div>
           <SectionDivider
             label={`Campanhas — ${periodoLabel}`}
-            description={`${campanhasExibidas.length} campanha${campanhasExibidas.length !== 1 ? "s" : ""} encontrada${campanhasExibidas.length !== 1 ? "s" : ""} · pause, ative ou analise individualmente com IA`}
+            description={`${campanhasExibidas.length} campanha${campanhasExibidas.length !== 1 ? "s" : ""} encontrada${campanhasExibidas.length !== 1 ? "s" : ""} · clique em qualquer campanha para editar`}
           />
+
+          {/* Vampiros de Orçamento */}
+          {(() => {
+            if (vampireDismissed || periodoMinDias < 3) return null;
+            const vampiros = campanhasExibidas.filter(
+              c => (c.verba_gasta || 0) > 30 && (c.cliques_whatsapp || 0) === 0,
+            );
+            if (vampiros.length === 0) return null;
+            const totalVerba = vampiros.reduce((s, c) => s + (c.verba_gasta || 0), 0);
+            return (
+              <div className="mt-4 bg-red/[0.04] border border-red/20 rounded-2xl px-5 py-4 animate-fade-up">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl flex-shrink-0 mt-0.5">🧛</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-red/80 font-mono mb-1">
+                      Vampiros de Orçamento detectados
+                    </p>
+                    <p className="text-[11px] font-mono text-slate-500 mb-3">
+                      {vampiros.length} campanha{vampiros.length !== 1 ? "s" : ""} gastou{" "}
+                      <span className="text-red/70">R${totalVerba.toFixed(0)}</span> em {periodoLabel} sem nenhum lead WhatsApp.
+                      Provavelmente segmentação errada ou criativo sem apelo para conversão.
+                    </p>
+                    <div className="space-y-1.5 mb-4">
+                      {vampiros.map(c => (
+                        <div key={c.id} className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red/50 flex-shrink-0" />
+                          <span className="text-[10px] font-mono text-slate-400 truncate flex-1">{c.nome}</span>
+                          <span className="text-[10px] font-mono text-red/60 flex-shrink-0 ml-2">
+                            R${(c.verba_gasta || 0).toFixed(0)} · 0 leads
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => pausarVampires(vampiros)}
+                        disabled={pausingVampires}
+                        className={clsx(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all",
+                          "bg-red/10 border-red/25 text-red hover:bg-red/20 hover:border-red/40",
+                          "disabled:opacity-50 active:scale-95",
+                        )}
+                      >
+                        {pausingVampires
+                          ? <Loader size={11} className="animate-spin" />
+                          : <Pause size={11} />
+                        }
+                        Pausar todas
+                      </button>
+                      <button
+                        onClick={() => setVampireDismissed(true)}
+                        className="px-3 py-1.5 border border-border text-slate-600 text-xs font-mono rounded-xl hover:text-slate-300 hover:border-slate-600 transition-all"
+                      >
+                        Ignorar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="bg-card border border-border rounded-2xl p-5 mt-4">
             <CriativoTable
               campanhas={campanhasExibidas}

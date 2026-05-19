@@ -1,7 +1,115 @@
 import { clsx } from "clsx";
-import { Play, Pause, Loader, BrainCircuit, Pencil, Check, X, DollarSign } from "lucide-react";
+import { Play, Pause, Loader, BrainCircuit, Pencil, Check, X, DollarSign, Flame } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import AnaliseModal from "./AnaliseModal";
+
+/* ── Saturation helpers ───────────────────────────────────────────────────── */
+
+/**
+ * Calcula o índice de saturação de um criativo baseado em frequência + CTR.
+ * Retorna { nivel, score 0-100, label, hint, action }
+ */
+export function getSaturation(campanha) {
+  const freq  = campanha.frequencia  || 0;
+  const ctr   = campanha.ctr         || 0;
+  const verba = campanha.verba_gasta || 0;
+
+  if (verba < 15 || freq === 0) {
+    return { nivel: "unknown", score: 0, label: "—", hint: "Dados insuficientes", action: null };
+  }
+
+  // Ambos ruins → saturação clássica (frequência alta + CTR colapsado)
+  if (freq > 3.5 && ctr > 0 && ctr < 0.8) {
+    return {
+      nivel: "critical", score: 100,
+      label: "Saturado",
+      hint: `Freq. ${freq.toFixed(1)}x + CTR ${ctr.toFixed(2)}% → criativo esgotado`,
+      action: "PAUSAR",
+    };
+  }
+  // Frequência sozinha muito alta
+  if (freq > 4.0) {
+    return {
+      nivel: "critical", score: 90,
+      label: "Freq. crítica",
+      hint: `Freq. ${freq.toFixed(1)}x — público vendo muitas vezes sem clicar`,
+      action: "REVISAR",
+    };
+  }
+  // CTR muito baixo com verba significativa
+  if (verba > 50 && ctr > 0 && ctr < 0.5) {
+    return {
+      nivel: "critical", score: 85,
+      label: "CTR crítico",
+      hint: `CTR ${ctr.toFixed(2)}% — criativo fraco, troque o anúncio`,
+      action: "OTIMIZAR",
+    };
+  }
+  // Atenção: frequência subindo OU CTR abaixo do mínimo
+  if (freq > 2.5 || (ctr > 0 && ctr < 0.8)) {
+    return {
+      nivel: "warning", score: 60,
+      label: freq > 2.5 ? "Freq. alta" : "CTR baixo",
+      hint: `Freq. ${freq.toFixed(1)}x, CTR ${ctr.toFixed(2)}%`,
+      action: null,
+    };
+  }
+  // Monitorar: próximo dos limites
+  if (freq > 1.8 || (ctr > 0 && ctr < 1.2)) {
+    return {
+      nivel: "watch", score: 30,
+      label: "Monitorar",
+      hint: `Freq. ${freq.toFixed(1)}x, CTR ${ctr.toFixed(2)}%`,
+      action: null,
+    };
+  }
+  return {
+    nivel: "ok", score: 8,
+    label: "Saudável",
+    hint: `Freq. ${freq.toFixed(1)}x, CTR ${ctr.toFixed(2)}%`,
+    action: null,
+  };
+}
+
+/** Barra de termômetro visual por campanha */
+function SaturationBar({ campanha }) {
+  const sat = getSaturation(campanha);
+
+  const barColor = {
+    critical: "bg-red",
+    warning:  "bg-amber",
+    watch:    "bg-amber/40",
+    ok:       "bg-green",
+    unknown:  "bg-slate-700",
+  }[sat.nivel] ?? "bg-slate-700";
+
+  const textColor = {
+    critical: "text-red",
+    warning:  "text-amber",
+    watch:    "text-slate-500",
+    ok:       "text-green/70",
+    unknown:  "text-slate-700",
+  }[sat.nivel] ?? "text-slate-700";
+
+  return (
+    <div className="w-[72px]" title={sat.hint}>
+      <div className="w-full h-1.5 bg-border rounded-full overflow-hidden mb-1">
+        <div
+          className={clsx(
+            "h-full rounded-full transition-all duration-500",
+            barColor,
+            sat.nivel === "critical" && "animate-pulse",
+          )}
+          style={{ width: `${sat.score}%` }}
+        />
+      </div>
+      <p className={clsx("text-[9px] font-mono truncate", textColor)}>
+        {sat.nivel === "critical" && <Flame size={8} className="inline mr-0.5 mb-0.5" />}
+        {sat.label}
+      </p>
+    </div>
+  );
+}
 
 const STATUS = {
   ACTIVE:   { dot: "bg-green animate-pulse-dot", badge: "text-green bg-green/10 border-green/20",  label: "ATIVO",    border: "border-l-green/40" },
@@ -156,9 +264,10 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
   const [analiseState, setAnaliseState] = useState({ show: false, loading: false, analise: null, campanhaNome: null });
 
   const handleAnalisar = async (campanha) => {
+    const sat = getSaturation(campanha);
     setAnaliseState({ show: true, loading: true, analise: null, campanhaNome: campanha.nome });
     try {
-      const resultado = await onAnalisarCampanha(campanha);
+      const resultado = await onAnalisarCampanha(campanha, sat);
       setAnaliseState(prev => ({ ...prev, loading: false, analise: resultado }));
     } catch {
       setAnaliseState(prev => ({ ...prev, loading: false, analise: "Erro ao conectar com o serviço de IA." }));
@@ -204,6 +313,7 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest w-16 text-right hidden md:block">Verba</p>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest w-14 text-right">Leads</p>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest w-28 hidden lg:block">CTR</p>
+          <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest w-[72px] hidden lg:block">Saturação</p>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest w-16 text-right hidden lg:block">CPL</p>
           {actionsCount > 0 && (
             <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest text-right"
@@ -272,6 +382,11 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                   <CtrBar ctr={ad.ctr || 0} />
                 </div>
 
+                {/* Saturation thermometer */}
+                <div className="w-[72px] hidden lg:flex justify-start">
+                  <SaturationBar campanha={ad} />
+                </div>
+
                 {/* CPL */}
                 <div className="text-right w-16 hidden lg:block">
                   <p className={clsx("text-xs font-mono font-bold tabular-nums", cplColor)}>
@@ -307,21 +422,36 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                         onToggle={onToggleStatus}
                       />
                     )}
-                    {hasAnalise && (
-                      <button
-                        onClick={() => handleAnalisar(ad)}
-                        title="Analisar com IA"
-                        className={clsx(
-                          "flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all active:scale-95",
-                          "bg-violet/10 border-violet/25 text-violet",
-                          "hover:bg-violet/20 hover:border-violet/45",
-                          "text-[10px] font-mono whitespace-nowrap",
-                        )}
-                      >
-                        <BrainCircuit size={11} />
-                        <span className="hidden xl:inline">IA</span>
-                      </button>
-                    )}
+                    {hasAnalise && (() => {
+                      const sat = getSaturation(ad);
+                      const aiStyle = {
+                        critical: "bg-red/10 border-red/30 text-red hover:bg-red/20 hover:border-red/50",
+                        warning:  "bg-amber/10 border-amber/25 text-amber hover:bg-amber/20 hover:border-amber/45",
+                        watch:    "bg-violet/10 border-violet/25 text-violet hover:bg-violet/20 hover:border-violet/45",
+                        ok:       "bg-violet/10 border-violet/25 text-violet hover:bg-violet/20 hover:border-violet/45",
+                        unknown:  "bg-violet/10 border-violet/25 text-violet hover:bg-violet/20 hover:border-violet/45",
+                      }[sat.nivel] ?? "bg-violet/10 border-violet/25 text-violet hover:bg-violet/20 hover:border-violet/45";
+                      const aiTitle = sat.nivel === "critical"
+                        ? `⚠ ${sat.hint} — Analisar com IA`
+                        : "Analisar com IA";
+                      return (
+                        <button
+                          onClick={() => handleAnalisar(ad)}
+                          title={aiTitle}
+                          className={clsx(
+                            "flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all active:scale-95",
+                            "text-[10px] font-mono whitespace-nowrap",
+                            aiStyle,
+                            sat.nivel === "critical" && "animate-pulse",
+                          )}
+                        >
+                          <BrainCircuit size={11} />
+                          <span className="hidden xl:inline">
+                            {sat.nivel === "critical" ? "IA !" : "IA"}
+                          </span>
+                        </button>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

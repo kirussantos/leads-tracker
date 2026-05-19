@@ -27,7 +27,8 @@ class AnalisarRequest(BaseModel):
 class AnalisarCampanhaRequest(BaseModel):
     cliente_nome: str
     periodo: str
-    campanha: dict  # dados completos da campanha individual
+    campanha: dict              # dados completos da campanha individual
+    saturacao: Optional[dict] = None   # { nivel: "critical"|"warning", hint: str }
 
 
 @router.post("/analisar")
@@ -125,7 +126,21 @@ def analisar_campanha_individual(data: AnalisarCampanhaRequest):
         cpm = (verba / impressoes * 1000) if impressoes > 0 else 0
         taxa_conv_wpp = (cliques_wpp / cliques * 100) if cliques > 0 else 0
 
+        # Bloco de alerta de saturação (injetado no topo do prompt quando detectado)
+        alerta_sat = ""
+        if data.saturacao and data.saturacao.get("nivel") in ("critical", "warning"):
+            icone = "🔴" if data.saturacao.get("nivel") == "critical" else "🟡"
+            label = "CRIATIVO SATURADO — AÇÃO URGENTE" if data.saturacao.get("nivel") == "critical" else "SINAL DE SATURAÇÃO EMERGENTE"
+            alerta_sat = f"""
+⚠️ **ALERTA AUTOMÁTICO DO SISTEMA:** {icone} {label}
+→ {data.saturacao.get('hint', '')}
+O sistema detectou saturação de público/criativo. Trate isso como prioridade máxima no diagnóstico. Se os dados confirmarem, o veredito deve ser OTIMIZAR ou PAUSAR, não ESCALAR.
+
+---
+"""
+
         prompt = f"""Você é um especialista sênior em tráfego pago no Meta Ads com 10+ anos de experiência em clínicas de saúde no Brasil. Sua tarefa é analisar UMA campanha específica e dar um veredito claro e decisões exatas.
+{alerta_sat}
 
 **CLIENTE:** {data.cliente_nome}
 **PERÍODO ANALISADO:** {data.periodo}
