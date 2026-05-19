@@ -47,6 +47,7 @@ export default function Dashboard() {
 
   const [saldos,        setSaldos]        = useState([]);
   const [loadingSaldos, setLoadingSaldos] = useState(false);
+  const [errSaldos,     setErrSaldos]     = useState(false);
 
   const [showAnalise,    setShowAnalise]    = useState(false);
   const [analise,        setAnalise]        = useState(null);
@@ -90,14 +91,17 @@ export default function Dashboard() {
 
     // Busca saldos em paralelo (não bloqueia o fetch de período)
     setLoadingSaldos(true);
+    setErrSaldos(false);
     Promise.all(
       clientes.map(c =>
-        axios.get(`${API}/meta/conta/saldo`, { params: { cliente_id: c.id }, timeout: 20000 })
+        axios.get(`${API}/meta/conta/saldo`, { params: { cliente_id: c.id }, timeout: 30000 })
           .then(r => ({ ...r.data, cliente_id: c.id }))
-          .catch(() => null)
+          .catch(e => { console.warn("saldo error", c.id, e?.message); return null; })
       )
     ).then(results => {
-      setSaldos(results.filter(Boolean));
+      const ok = results.filter(Boolean);
+      setSaldos(ok);
+      setErrSaldos(ok.length === 0);
       setLoadingSaldos(false);
     });
 
@@ -529,22 +533,29 @@ export default function Dashboard() {
         </div>
 
         {/* ── Fôlego das Contas ── */}
-        {(loadingSaldos || saldos.length > 0) && (
-          <div>
-            <SectionDivider
-              label="Fôlego das Contas"
-              description="Saldo prepago restante e estimativa de duração com base no ritmo atual de gasto"
-            />
-            <div className="mt-4">
+        <div>
+          <SectionDivider
+            label="Fôlego das Contas"
+            description="Saldo prepago restante e estimativa de duração com base no ritmo atual de gasto"
+          />
+          <div className="mt-4">
+            {errSaldos ? (
+              <div className="bg-card border border-border rounded-2xl p-6 flex items-center gap-3">
+                <AlertCircle size={14} className="text-amber flex-shrink-0" />
+                <p className="text-[10px] font-mono text-amber/70">
+                  Não foi possível consultar o saldo das contas. Verifique o token Meta ou tente novamente.
+                </p>
+              </div>
+            ) : (
               <SaldoContas
                 saldos={saldos}
                 loading={loadingSaldos}
                 periodoData={periodoData}
                 periodoRange={periodoRange}
               />
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* ── Por Cliente ── */}
         <div>

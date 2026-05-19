@@ -35,7 +35,16 @@ export default function SaldoContas({ saldos = [], loading, periodoData, periodo
     );
   }
 
-  if (!saldos.length) return null;
+  if (!saldos.length) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-6 flex items-center gap-3">
+        <Fuel size={14} className="text-slate-700 flex-shrink-0" />
+        <p className="text-[10px] font-mono text-slate-600">
+          Nenhuma conta com saldo disponível no período.
+        </p>
+      </div>
+    );
+  }
 
   // Quantos dias o período representa
   const periodoDias = (() => {
