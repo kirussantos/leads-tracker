@@ -242,7 +242,7 @@ export default function Dashboard() {
           n_campanhas:        display.n_campanhas,
         },
         campanhas: campsForAI,
-      });
+      }, { timeout: 150000 }); // 150s = 4 modelos NVIDIA (30s cada) + Claude
       setAnalise(resp.data.analise ?? resp.data.erro ?? "Erro ao gerar análise.");
       setAnaliseModelo(resp.data.modelo ?? null);
     } catch {

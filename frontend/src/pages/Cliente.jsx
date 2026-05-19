@@ -162,7 +162,7 @@ export default function Cliente() {
       saturacao: saturacao && ["critical", "warning"].includes(saturacao.nivel)
         ? { nivel: saturacao.nivel, hint: saturacao.hint }
         : null,
-    });
+    }, { timeout: 150000 });
     if (resp.data?.erro) throw new Error(resp.data.erro);
     // Retorna objeto com analise e modelo para CriativoTable exibir o badge
     return {
@@ -290,7 +290,7 @@ export default function Cliente() {
           n_campanhas:        display.n_campanhas,
         },
         campanhas: campsForAI,
-      });
+      }, { timeout: 150000 }); // 150s = 4 modelos NVIDIA (30s cada) + Claude
       setAnalise(resp.data.analise ?? resp.data.erro ?? "Erro ao gerar análise.");
       setAnaliseModelo(resp.data.modelo ?? null);
     } catch {

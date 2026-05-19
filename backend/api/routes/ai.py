@@ -1,5 +1,4 @@
 import os
-import time
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -8,23 +7,16 @@ import io
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-# ─── Modelos NVIDIA NIM (melhor → pior para análise) ─────────────────────────
-# Todos gratuitos em integrate.api.nvidia.com/v1
-# 40 RPM por modelo → multi-fallback garante disponibilidade contínua
+# ─── Modelos NVIDIA NIM — lista enxuta com IDs verificados ───────────────────
+# Timeout por modelo: 30s. Com 4 modelos = no máximo 120s antes do Claude.
 NVIDIA_MODELS = [
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1",   # Melhor reasoning NVIDIA
-    "deepseek-ai/deepseek-r1",                   # Campeão de raciocínio 671B
-    "deepseek-ai/deepseek-v4-pro",               # 1.6T MoE, 1M contexto
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5",  # Rápido + reasoning
-    "nvidia/nemotron-3-super-120b-a12b",          # 1M contexto, agentico
-    "qwen/qwq-32b",                               # 32B reasoning eficiente
-    "deepseek-ai/deepseek-v4-flash",             # Rápido, 1M contexto
-    "meta/llama-3.3-70b-instruct",               # Confiável e sólido
-    "minimaxai/minimax-m2.7",                    # 230B MoE
-    "mistralai/mixtral-8x22b-instruct",          # MoE fallback
-    "meta/llama-3.1-70b-instruct",              # Clássico estável
-    "meta/llama-3.1-8b-instruct",              # Último recurso — rápido
+    "meta/llama-3.3-70b-instruct",          # Rápido, reasoning sólido
+    "deepseek-ai/deepseek-r1",              # Reasoning 671B
+    "meta/llama-3.1-70b-instruct",          # Clássico estável
+    "mistralai/mixtral-8x22b-instruct",     # MoE, boa cobertura
 ]
+
+_NVIDIA_TIMEOUT = 30   # segundos por modelo
 
 # ─── Prompt do Agente Ultra-Especialista ──────────────────────────────────────
 SYSTEM_PROMPT = """A partir de agora, você é um dos maiores especialistas do mundo em gestão de tráfego pago, análise de campanhas, otimização de performance e escala de anúncios digitais.
@@ -90,12 +82,14 @@ def _call_nvidia(user_message: str, max_tokens: int = 4096) -> tuple[str, str]:
 
     try:
         from openai import OpenAI
+        import httpx
     except ImportError:
         raise ImportError("openai não instalado — rode: pip install openai")
 
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=nvidia_key,
+        timeout=httpx.Timeout(_NVIDIA_TIMEOUT),  # timeout explícito por request
     )
 
     last_err = None
@@ -109,11 +103,10 @@ def _call_nvidia(user_message: str, max_tokens: int = 4096) -> tuple[str, str]:
                 ],
                 max_tokens=max_tokens,
                 temperature=0.3,
-                timeout=120,
             )
             text = resp.choices[0].message.content or ""
-            # Remove thinking tags que alguns modelos incluem
-            if "<think>" in text and "</think>" in text:
+            # Remove thinking tags (DeepSeek-R1 etc.)
+            if "<think>" in text:
                 import re
                 text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
             model_short = model.split("/")[-1]
@@ -123,15 +116,14 @@ def _call_nvidia(user_message: str, max_tokens: int = 4096) -> tuple[str, str]:
             last_err = e
             err_str = str(e).lower()
             if any(x in err_str for x in ["429", "rate limit", "too many", "quota"]):
-                print(f"[AI] {model} → 429 rate limit, tentando próximo...")
-                time.sleep(0.3)
-                continue
-            elif any(x in err_str for x in ["404", "not found", "model"]):
-                print(f"[AI] {model} → modelo não encontrado, tentando próximo...")
-                continue
+                print(f"[AI] {model} → 429, tentando próximo...")
+            elif any(x in err_str for x in ["404", "not found", "model", "invalid"]):
+                print(f"[AI] {model} → modelo inválido/não encontrado, tentando próximo...")
+            elif any(x in err_str for x in ["timeout", "timed out", "read timeout"]):
+                print(f"[AI] {model} → timeout ({_NVIDIA_TIMEOUT}s), tentando próximo...")
             else:
-                print(f"[AI] {model} → erro: {e}, tentando próximo...")
-                continue
+                print(f"[AI] {model} → erro: {type(e).__name__}: {e}, tentando próximo...")
+            continue
 
     raise RuntimeError(f"Todos os modelos NVIDIA NIM falharam. Último erro: {last_err}")
 
@@ -143,13 +135,25 @@ def _call_claude(user_message: str, max_tokens: int = 4096) -> tuple[str, str]:
         raise ValueError("ANTHROPIC_API_KEY não configurado")
     import anthropic
     client = anthropic.Anthropic(api_key=api_key)
-    msg = client.messages.create(
-        model="claude-opus-4-7",
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    return msg.content[0].text, "claude-opus-4"
+    # Tenta modelos em ordem de disponibilidade
+    for model_id, label in [
+        ("claude-opus-4-5",             "claude-opus-4"),
+        ("claude-3-5-sonnet-20241022",  "claude-3.5-sonnet"),
+        ("claude-3-5-haiku-20241022",   "claude-3.5-haiku"),
+    ]:
+        try:
+            msg = client.messages.create(
+                model=model_id,
+                max_tokens=max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_message}],
+            )
+            print(f"[AI] Claude sucesso com {model_id}")
+            return msg.content[0].text, label
+        except Exception as e:
+            print(f"[AI] Claude {model_id} → {e}, tentando próximo...")
+            continue
+    raise RuntimeError("Todos os modelos Claude falharam")
 
 
 def _invoke(user_message: str, max_tokens: int = 4096) -> tuple[str, str]:
