@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = carregando
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => setUser(u ?? null));
@@ -16,7 +17,7 @@ export function AuthProvider({ children }) {
   const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, showWelcome, setShowWelcome }}>
       {children}
     </AuthContext.Provider>
   );

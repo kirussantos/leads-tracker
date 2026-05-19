@@ -118,10 +118,149 @@ const STATUS = {
   UNKNOWN:  { dot: "bg-slate-700",               badge: "text-slate-600 bg-transparent border-slate-700/50",  label: "—",        border: "border-l-border" },
 };
 
-function ToggleBtn({ status, campaignId, onToggle }) {
-  const [loading, setLoading] = useState(false);
+/* ── Ticker messages for bad campaigns ───────────────────────────────────── */
+
+const TICKER_CRITICAL = [
+  "🔴 CRIATIVO SATURADO — pode pausar que eu já não aguento mais",
+  "💸 dinheiro sendo incinerado em tempo real, parabéns pela coragem",
+  "📉 o público decorou esse anúncio na memória e ainda não clicou",
+  "🤡 CTR tão baixo que até outdoor em branco performa melhor",
+  "😱 o cliente vai ligar perguntando por que o resultado caiu, boa sorte com a resposta",
+  "🔥 criativo esgotado, público cansado, verba evaporando — tudo bem?",
+  "💀 essa campanha tá funcionando igual carro sem combustível: muito barulho, nenhum destino",
+  "🧛 mais um dia rodando isso e o orçamento vai pedir demissão",
+  "📢 ALERTA DE GESTOR CORAJOSO: ainda não pausou, hein",
+  "🚨 frequência nas alturas — eles te odeiam e você sabe disso",
+  "😵 o público já viu esse anúncio tantas vezes que sabe o texto de cor",
+  "🪦 aqui jaz o CPL do cliente — morto por negligência",
+  "🎪 que espetáculo de campanha — só não no sentido bom",
+  "🤦 esse anúncio tá mais cansado do que você numa segunda-feira",
+  "⚰️ R.I.P. budget — pausar teria sido tão simples",
+];
+
+const TICKER_WARNING = [
+  "⚠️ oi, só passando pra avisar que essa campanha tá começando a dar bode",
+  "👀 frequência subindo, CTR descendo — clássico sinal de que vai piorar",
+  "😬 não tá péssimo ainda, mas tá claramente a caminho",
+  "📊 o benchmark de CTR fica envergonhado quando olha pra essa campanha",
+  "🤔 'vou deixar mais um pouco' — você, provavelmente, agora mesmo",
+  "🌡️ termômetro de criativo subindo, vai chegar no crítico e aí lembra de mim",
+  "😏 tá bem... mas por quanto tempo? tick tock",
+  "🎯 a frequência tá mandando um recado: o público já conhece demais esse anúncio",
+  "🐢 campanha desacelerando — não por conta própria",
+  "🍿 assistindo o CTR cair em câmera lenta — interessante escolha de gestão",
+  "📉 cada dia que passa esse anúncio convence menos gente. coincidência? não.",
+  "🙃 tudo bem, tudo ótimo, campanha ótima, números... menos ótimos",
+];
+
+const SEP = "   ⬥   ";
+
+function buildTickerText(msgs) {
+  return msgs.join(SEP) + SEP;
+}
+
+const TICKER_WATCH = [
+  "👀 de olhinho nessa campanha... não faz bobagem",
+  "📊 os números tão... okays. por enquanto",
+  "🧐 tá monitorada. não tire os olhos por muito tempo",
+  "🫣 não tô dizendo que tá ruim... mas também não tô dizendo que tá ótimo",
+  "⏱️ dando tempo pra essa campanha se redimir. o relógio corre",
+  "🤨 'tá no limite' não é o mesmo que 'tá bem'",
+  "🔔 lembrete suave: essa aqui merece atenção, não abandono",
+  "📌 marcada pra acompanhamento — você já viu os números hoje?",
+  "🙃 não tá queimando dinheiro ainda. ênfase no 'ainda'",
+  "🐢 indo devagar... lento demais pra ser ignorada",
+  "📡 sinal fraco detectado. monitore antes de chegar no vermelho",
+  "🎯 atenção moderada requerida — não é drama, é cuidado",
+  "🔍 CTR um pouquinho tímido... nada urgente. ainda.",
+  "🫥 invisível não significa inexistente — olha pra ela de vez em quando",
+  "📉 não é alarme, é só um lembrete de que isso pode escalar",
+];
+
+/** Ticker que rola horizontalmente abaixo de campanhas com métricas ruins ou em monitoramento */
+function TickerBad({ campanha }) {
+  const sat = getSaturation(campanha);
+  const isCritical = sat.nivel === "critical";
+  const isWarning  = sat.nivel === "warning";
+  const isWatch    = sat.nivel === "watch";
+
+  // Só aparece para campanhas ACTIVE com atenção necessária
+  if (campanha.status !== "ACTIVE" || (!isCritical && !isWarning && !isWatch)) return null;
+
+  const msgs     = isCritical ? TICKER_CRITICAL : isWarning ? TICKER_WARNING : TICKER_WATCH;
+  const text     = buildTickerText(msgs);
+  const bgClass  = isCritical ? "bg-red/[0.06] border-red/20"
+                 : isWarning  ? "bg-amber/[0.05] border-amber/15"
+                 :              "bg-violet/[0.04] border-violet/10";
+  const txtClass = isCritical ? "text-red/60"
+                 : isWarning  ? "text-amber/50"
+                 :              "text-violet/40";
+  const animCls  = isCritical ? "animate-ticker"
+                 : isWarning  ? "animate-ticker-slow"
+                 :              "animate-ticker-vslow";
+
+  return (
+    <div className={`overflow-hidden border-t ${bgClass} rounded-b-xl`}>
+      <div className={`flex whitespace-nowrap ${animCls}`}>
+        {/* duplicado para o loop seamless */}
+        <span className={`text-[9px] font-mono tracking-wide py-1 px-4 ${txtClass} flex-shrink-0`}>
+          {text}{text}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const MSGS_SAUDAVEL = [
+  "Não mexe nessa campanha seu merdinha 🫵",
+  "Tá indo bem demais pra você bagunçar. Sai daqui! 😤",
+  "CPL bom, leads chegando. Vai pausar por quê? Ego? 🧠",
+  "Essa campanha tá te amando. Vai trair ela assim? 💔",
+  "Se você pausar isso eu conto pro cliente. 📢",
+  "Dinheiro entrando. Você com vontade de apertar botão. Clássico. 🤡",
+  "Essa aqui roda sozinha. Você só atrapalha. 🚀",
+  "Para. Pensa. Tira a mão daí. 🛑",
+  "ALERTA: mão coçando sem motivo detectada ⚠️",
+  "Gestor(a) de tráfego ou sabotador(a)? Escolha um. 🎯",
+  "Essa campanha nunca fez nada de errado pra você. 🥺",
+  "Vai mexer no que tá bom? Típico. 💀",
+  "A Meta tá feliz. O cliente tá feliz. Só você não. Por quê? 😭",
+  "Campanha = impressora de dinheiro. Você = mão travessa. 🖨️💸",
+  "Isso aqui é zona proibida. Passa o mouse e vai embora. 🚧",
+  "Se pausar, você vai ter que explicar pro cliente. Cuidado. 😬",
+];
+
+const MSGS_REATIVAR = [
+  "PARA. Essa campanha foi pausada por um motivo. 🚨",
+  "Você quer reativar... isso? Sério? 🤡",
+  "Reativar CPL alto = queimar verba = cliente furioso. Boa sorte. 💸",
+  "Ei. Pensa bem antes de apertar esse botão. Por favor. 🙏",
+  "O público já odiava esse anúncio antes de pausar. Nada mudou. 😬",
+  "Vai reativar? Tudo bem. Mas não diz que não foi avisado(a). ⚠️",
+  "Você tá de brincadeira, né? Não tá? 😰",
+  "O cliente não sabe que você tá prestes a fazer isso, né? 🤫",
+  "Antes de clicar, respira fundo. Conta até 10. Agora desiste. 🛑",
+  "Esse botão revive campanha morta. Algumas coisas deveriam ficar mortas. 💀",
+  "CTR no chão, verba alta, cliente estressado — e você quer ligar de novo? 😵",
+  "Reativar isso é basicamente pedir pro cliente te ligar às 23h. 📱",
+  "A campanha tá pausada, o orçamento agradece. Não arruíne isso. 🌸",
+  "Ok, mas quando der errado (e vai), lembra que você escolheu isso. 🫵",
+  "Gestor que reativa campanha ruim aprende na hora. Na hora mais cara. 🔥",
+  "Eu, o sistema e o cliente vamos te julgar. Todos. Simultaneamente. 👀",
+  "EI! OI! ALÔÔ! Essa campanha foi PAUSADA por MOTIVO. Para aí! 📢",
+  "Salvando verba ou sabotando o cliente? Porque parece a segunda opção. 🤨",
+];
+
+function ToggleBtn({ status, campaignId, onToggle, satNivel }) {
+  const [loading,  setLoading]  = useState(false);
+  const [showTip,  setShowTip]  = useState(false);
+  const [tipMsg,   setTipMsg]   = useState("");
+  const [tipKind,  setTipKind]  = useState("ok"); // "ok" | "reativar"
+
   if (!campaignId || status === "ARCHIVED" || status === "UNKNOWN") return null;
-  const isPaused = status === "PAUSED";
+  const isPaused    = status === "PAUSED";
+  const isHealthy   = !isPaused && (satNivel === "ok" || satNivel === "watch");
+  const isBadPaused = isPaused  && (satNivel === "warning" || satNivel === "critical");
 
   const handleClick = async () => {
     setLoading(true);
@@ -129,24 +268,55 @@ function ToggleBtn({ status, campaignId, onToggle }) {
     finally { setLoading(false); }
   };
 
+  const handleMouseEnter = () => {
+    if (isHealthy) {
+      setTipKind("ok");
+      setTipMsg(MSGS_SAUDAVEL[Math.floor(Math.random() * MSGS_SAUDAVEL.length)]);
+      setShowTip(true);
+    } else if (isBadPaused) {
+      setTipKind("reativar");
+      setTipMsg(MSGS_REATIVAR[Math.floor(Math.random() * MSGS_REATIVAR.length)]);
+      setShowTip(true);
+    }
+  };
+
+  // Estilos do balão por tipo
+  const tipBg     = tipKind === "reativar" ? "bg-[#1e0f0f]"        : "bg-[#1a1a2e]";
+  const tipBorder = tipKind === "reativar" ? "border-red/40"        : "border-violet/30";
+  const tipText   = tipKind === "reativar" ? "text-red/90"          : "text-slate-100";
+  const tipArrowB = tipKind === "reativar" ? "border-red/40"        : "border-violet/30";
+  const tipArrowC = tipKind === "reativar" ? "bg-[#1e0f0f]"        : "bg-[#1a1a2e]";
+
   return (
-    <button
-      onClick={handleClick}
-      disabled={loading}
-      title={isPaused ? "Ativar campanha" : "Pausar campanha"}
-      className={clsx(
-        "flex items-center justify-center w-8 h-8 rounded-xl border transition-all active:scale-95",
-        "disabled:opacity-40 disabled:cursor-not-allowed",
-        isPaused
-          ? "border-green/30 text-green hover:bg-green/10 hover:border-green/50"
-          : "border-amber/30 text-amber hover:bg-amber/10 hover:border-amber/50",
+    <div className="relative" onMouseLeave={() => setShowTip(false)}>
+      {showTip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-50 pointer-events-none animate-fade-up">
+          <div className={`${tipBg} border ${tipBorder} rounded-xl px-3 py-2 shadow-xl shadow-black/50 max-w-[260px]`}>
+            <p className={`text-[11px] font-mono ${tipText} leading-snug`}>{tipMsg}</p>
+          </div>
+          {/* arrow */}
+          <div className={`mx-auto w-2.5 h-2.5 ${tipArrowC} border-r border-b ${tipArrowB} rotate-45 -mt-[5px]`} />
+        </div>
       )}
-    >
-      {loading
-        ? <Loader size={12} className="animate-spin" />
-        : isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />
-      }
-    </button>
+      <button
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        disabled={loading}
+        title={isPaused ? "Ativar campanha" : "Pausar campanha"}
+        className={clsx(
+          "flex items-center justify-center w-8 h-8 rounded-xl border transition-all active:scale-95",
+          "disabled:opacity-40 disabled:cursor-not-allowed",
+          isPaused
+            ? "border-green/30 text-green hover:bg-green/10 hover:border-green/50"
+            : "border-amber/30 text-amber hover:bg-amber/10 hover:border-amber/50",
+        )}
+      >
+        {loading
+          ? <Loader size={12} className="animate-spin" />
+          : isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />
+        }
+      </button>
+    </div>
   );
 }
 
@@ -260,15 +430,20 @@ function CtrBar({ ctr }) {
   );
 }
 
-export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalisarCampanha, onUpdateBudget, onEditCampanha }) {
-  const [analiseState, setAnaliseState] = useState({ show: false, loading: false, analise: null, campanhaNome: null });
+export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalisarCampanha, onUpdateBudget, onEditCampanha, clienteNome = null, periodo = null }) {
+  const [analiseState, setAnaliseState] = useState({ show: false, loading: false, analise: null, modelo: null, campanhaNome: null });
 
   const handleAnalisar = async (campanha) => {
     const sat = getSaturation(campanha);
-    setAnaliseState({ show: true, loading: true, analise: null, campanhaNome: campanha.nome });
+    setAnaliseState({ show: true, loading: true, analise: null, modelo: null, campanhaNome: campanha.nome });
     try {
       const resultado = await onAnalisarCampanha(campanha, sat);
-      setAnaliseState(prev => ({ ...prev, loading: false, analise: resultado }));
+      // Suporta tanto string simples (legado) quanto { analise, modelo }
+      if (resultado && typeof resultado === "object") {
+        setAnaliseState(prev => ({ ...prev, loading: false, analise: resultado.analise ?? "Sem análise.", modelo: resultado.modelo ?? null }));
+      } else {
+        setAnaliseState(prev => ({ ...prev, loading: false, analise: resultado }));
+      }
     } catch {
       setAnaliseState(prev => ({ ...prev, loading: false, analise: "Erro ao conectar com o serviço de IA." }));
     }
@@ -299,8 +474,11 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
         <AnaliseModal
           analise={analiseState.analise}
           loading={analiseState.loading}
-          title="Melhor Decisão — IA"
+          title="Auditoria de Campanha — IA"
           subtitle={analiseState.campanhaNome}
+          modelo={analiseState.modelo}
+          clienteNome={clienteNome}
+          periodo={periodo}
           onClose={() => setAnaliseState(prev => ({ ...prev, show: false }))}
         />
       )}
@@ -334,15 +512,22 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
           return (
             <div
               key={ad.id || i}
+              className="animate-fade-up"
+              style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
+            >
+            <div
               onClick={hasEdit ? () => onEditCampanha(ad) : undefined}
               className={clsx(
-                "flex items-center gap-3 px-4 py-3.5 rounded-xl border border-l-2 transition-all group",
-                "hover:bg-white/[0.018] animate-fade-up",
+                "flex items-center gap-3 px-4 py-3.5 border border-l-2 transition-all group",
+                "hover:bg-white/[0.018]",
                 "border-border",
                 s.border,
                 hasEdit && "cursor-pointer",
+                // rounded: se tem ticker abaixo, só arredonda o topo
+                (ad.status === "ACTIVE" && ["critical","warning","watch"].includes(getSaturation(ad).nivel))
+                  ? "rounded-t-xl"
+                  : "rounded-xl",
               )}
-              style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
             >
               {/* Status dot */}
               <div className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0", s.dot)} />
@@ -420,6 +605,7 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                         status={ad.status}
                         campaignId={ad.id}
                         onToggle={onToggleStatus}
+                        satNivel={getSaturation(ad).nivel}
                       />
                     )}
                     {hasAnalise && (() => {
@@ -455,6 +641,8 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                   </div>
                 )}
               </div>
+            </div>
+            <TickerBad campanha={ad} />
             </div>
           );
         })}

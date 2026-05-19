@@ -47,6 +47,7 @@ export default function Cliente() {
 
   const [showAnalise,    setShowAnalise]    = useState(false);
   const [analise,        setAnalise]        = useState(null);
+  const [analiseModelo,  setAnaliseModelo]  = useState(null);
   const [loadingAnalise, setLoadingAnalise] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
@@ -119,23 +120,34 @@ export default function Cliente() {
   };
 
   const analisarCampanhaIndividual = async (campanha, saturacao = null) => {
-    const resp = await axios.post(`${API}/ai/campanha`, {
+    const verba = campanha.verba_gasta || campanha.verba || 0;
+    const imp   = campanha.impressoes || 0;
+    const resp  = await axios.post(`${API}/ai/campanha`, {
       cliente_nome: cliente?.nome ?? "Cliente",
       periodo: periodoLabel,
       campanha: {
-        nome: campanha.nome, status: campanha.status,
-        verba_gasta: campanha.verba_gasta || 0, impressoes: campanha.impressoes || 0,
-        alcance: campanha.alcance || 0, cliques: campanha.cliques || 0,
-        cliques_whatsapp: campanha.cliques_whatsapp || 0, ctr: campanha.ctr || 0,
-        cpl_estimado: campanha.cpl_estimado || 0, frequencia: campanha.frequencia || 0, cpc: campanha.cpc || 0,
+        nome:             campanha.nome,
+        status:           campanha.status,
+        verba_gasta:      verba,
+        impressoes:       imp,
+        alcance:          campanha.alcance || 0,
+        cliques:          campanha.cliques || 0,
+        cliques_whatsapp: campanha.cliques_whatsapp || campanha.cliques_wpp || 0,
+        ctr:              campanha.ctr || 0,
+        cpl_estimado:     campanha.cpl_estimado || 0,
+        frequencia:       campanha.frequencia || 0,
+        cpc:              campanha.cpc || 0,
       },
-      // Passa alerta de saturação para o Claude enfocar no diagnóstico correto
       saturacao: saturacao && ["critical", "warning"].includes(saturacao.nivel)
         ? { nivel: saturacao.nivel, hint: saturacao.hint }
         : null,
     });
     if (resp.data?.erro) throw new Error(resp.data.erro);
-    return resp.data.analise ?? "Erro ao gerar análise.";
+    // Retorna objeto com analise e modelo para CriativoTable exibir o badge
+    return {
+      analise: resp.data.analise ?? "Erro ao gerar análise.",
+      modelo:  resp.data.modelo ?? null,
+    };
   };
 
   const [campanhasStatus, setCampanhasStatus] = useState({});
@@ -208,24 +220,58 @@ export default function Cliente() {
     setShowAnalise(true);
     setLoadingAnalise(true);
     setAnalise(null);
+    setAnaliseModelo(null);
     try {
-      const campsForAI = (periodoData?.campanhas ?? campsFirestore.map(c => ({
-        nome: c.nome, status: c.status,
-        verba: c.verba_gasta || 0, impressoes: c.impressoes || 0,
-        cliques_wpp: c.cliques_whatsapp || 0, ctr: c.ctr || 0, cpl_estimado: 0, frequencia: 0,
-      }))).slice(0, 20);
+      const campsForAI = (periodoData?.campanhas
+        ? periodoData.campanhas.map(c => {
+            const verba = c.verba ?? c.verba_gasta ?? 0;
+            const imp   = c.impressoes ?? 0;
+            const wpp   = c.cliques_wpp ?? c.cliques_whatsapp ?? 0;
+            return {
+              nome:        c.nome || "—",
+              status:      c.status || "UNKNOWN",
+              verba,
+              impressoes:  imp,
+              alcance:     c.alcance ?? 0,
+              cliques:     c.cliques ?? 0,
+              cliques_wpp: wpp,
+              ctr:         c.ctr ?? 0,
+              cpl_estimado: wpp > 0 ? verba / wpp : 0,
+              frequencia:  c.frequencia ?? 0,
+              cpm:         imp > 0 ? (verba / imp * 1000) : 0,
+              cpc:         c.cpc ?? 0,
+            };
+          })
+        : campsFirestore.map(c => ({
+            nome: c.nome, status: c.status,
+            verba: c.verba_gasta || 0, impressoes: c.impressoes || 0,
+            alcance: c.alcance || 0, cliques: c.cliques || 0,
+            cliques_wpp: c.cliques_whatsapp || 0, ctr: c.ctr || 0,
+            cpl_estimado: c.cpl_estimado || 0, frequencia: c.frequencia || 0,
+            cpm: c.impressoes > 0 ? (c.verba_gasta / c.impressoes * 1000) : 0, cpc: c.cpc || 0,
+          }))
+      ).slice(0, 30);
 
       const resp = await axios.post(`${API}/ai/analisar`, {
         cliente_nome: cliente?.nome ?? "Cliente",
         periodo: periodoLabel,
         metricas: {
-          verba: display.verba, impressoes: display.impressoes, alcance: display.alcance,
-          cliques_wpp: display.cliques_wpp, ctr_medio: display.ctr, cpm: display.cpm,
-          cpl_estimado: display.cpl, frequencia_media: display.frequencia, n_campanhas: display.n_campanhas,
+          verba:              display.verba,
+          impressoes:         display.impressoes,
+          alcance:            display.alcance,
+          cliques_wpp:        display.cliques_wpp,
+          mensagens_enviadas: display.mensagens_enviadas ?? 0,
+          ctr_medio:          display.ctr,
+          cpm:                display.cpm,
+          cpl_estimado:       display.cpl,
+          custo_por_mensagem: display.custo_por_mensagem ?? 0,
+          frequencia_media:   display.frequencia,
+          n_campanhas:        display.n_campanhas,
         },
         campanhas: campsForAI,
       });
       setAnalise(resp.data.analise ?? resp.data.erro ?? "Erro ao gerar análise.");
+      setAnaliseModelo(resp.data.modelo ?? null);
     } catch {
       setAnalise("Erro ao conectar com o serviço de IA.");
     } finally {
@@ -268,7 +314,15 @@ export default function Cliente() {
   return (
     <>
       {showAnalise && (
-        <AnaliseModal analise={analise} loading={loadingAnalise} onClose={() => setShowAnalise(false)} />
+        <AnaliseModal
+          analise={analise}
+          loading={loadingAnalise}
+          onClose={() => setShowAnalise(false)}
+          title="Auditoria Completa — Meta Ads"
+          modelo={analiseModelo}
+          clienteNome={cliente?.nome}
+          periodo={periodoLabel}
+        />
       )}
 
       {editingCampanha && (
@@ -566,6 +620,8 @@ export default function Cliente() {
               onAnalisarCampanha={analisarCampanhaIndividual}
               onUpdateBudget={updateCampanhaBudget}
               onEditCampanha={setEditingCampanha}
+              clienteNome={cliente?.nome}
+              periodo={periodoLabel}
             />
           </div>
         </div>
