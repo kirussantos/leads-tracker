@@ -159,29 +159,13 @@ export default function Cliente() {
     }
   };
 
-  const salvarEdicaoCampanha = async ({ campaignId, nome, status, budget }) => {
-    const promises = [];
-    if (nome) {
-      promises.push(
-        axios.post(`${API}/meta/campanha/nome`, { cliente_id: id, campaign_id: campaignId, nome }),
-      );
+  // salvarEdicaoCampanha foi movido para dentro do CampanhaEditModal (faz as chamadas internamente)
+  // Aqui só precisamos reagir ao que mudou para atualizar o estado local
+  const handleCampanhaSaved = (novoStatus) => {
+    if (novoStatus && editingCampanha) {
+      setCampanhasStatus(prev => ({ ...prev, [editingCampanha.id]: novoStatus }));
     }
-    if (status) {
-      promises.push(
-        axios.post(`${API}/meta/campanha/status`, { cliente_id: id, campaign_id: campaignId, status }),
-      );
-    }
-    if (budget) {
-      promises.push(
-        axios.post(`${API}/meta/campanha/budget`, { cliente_id: id, campaign_id: campaignId, daily_budget: budget }),
-      );
-    }
-    // Run all in parallel — throws if any fail
-    await Promise.all(promises);
-    // Reflect status change locally without re-fetch
-    if (status) {
-      setCampanhasStatus(prev => ({ ...prev, [campaignId]: status }));
-    }
+    setEditingCampanha(null);
   };
 
   const analisarComIA = async () => {
@@ -254,8 +238,9 @@ export default function Cliente() {
       {editingCampanha && (
         <CampanhaEditModal
           campanha={editingCampanha}
+          clienteId={id}
           onClose={() => setEditingCampanha(null)}
-          onSave={salvarEdicaoCampanha}
+          onSaved={handleCampanhaSaved}
         />
       )}
 

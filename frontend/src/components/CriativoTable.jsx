@@ -224,11 +224,13 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
           return (
             <div
               key={ad.id || i}
+              onClick={hasEdit ? () => onEditCampanha(ad) : undefined}
               className={clsx(
                 "flex items-center gap-3 px-4 py-3.5 rounded-xl border border-l-2 transition-all group",
                 "hover:bg-white/[0.018] animate-fade-up",
                 "border-border",
                 s.border,
+                hasEdit && "cursor-pointer",
               )}
               style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
             >
@@ -279,7 +281,10 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
 
                 {/* Actions */}
                 {actionsCount > 0 && (
-                  <div className="flex items-center gap-1.5 justify-end">
+                  <div
+                    className="flex items-center gap-1.5 justify-end"
+                    onClick={e => e.stopPropagation()}
+                  >
                     {hasBudget && (
                       <BudgetEditor
                         campaignId={ad.id}
@@ -288,16 +293,12 @@ export default function CriativoTable({ campanhas = [], onToggleStatus, onAnalis
                       />
                     )}
                     {hasEdit && (
-                      <button
-                        onClick={() => onEditCampanha(ad)}
-                        title="Editar campanha"
-                        className={clsx(
-                          "flex items-center justify-center w-8 h-8 rounded-xl border transition-all active:scale-95",
-                          "border-border text-slate-600 hover:text-cyan hover:border-cyan/30 hover:bg-cyan/[0.06]",
-                        )}
+                      <div
+                        title="Clique na linha para editar"
+                        className="flex items-center justify-center w-8 h-8 rounded-xl border border-border/50 text-slate-700 group-hover:text-cyan group-hover:border-cyan/30 transition-all"
                       >
                         <Pencil size={12} />
-                      </button>
+                      </div>
                     )}
                     {hasToggle && (
                       <ToggleBtn

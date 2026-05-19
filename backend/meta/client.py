@@ -107,3 +107,24 @@ class MetaClient:
     def get_ads(self, adset_id: str) -> list:
         data = self._get(f"{adset_id}/ads", {"fields": "id,name,status", "limit": 100})
         return data.get("data", [])
+
+    def update_campaign(self, campaign_id: str, fields: dict) -> dict:
+        """Atualiza múltiplos campos de uma campanha em uma única chamada."""
+        return self._post(campaign_id, fields)
+
+    def get_campaign_adsets_full(self, campaign_id: str) -> list:
+        """Retorna adsets com todos os campos editáveis (targeting, bid, schedule)."""
+        data = self._get(f"{campaign_id}/adsets", {
+            "fields": "id,name,status,effective_status,daily_budget,lifetime_budget,"
+                      "bid_amount,optimization_goal,start_time,end_time,targeting",
+            "limit": 100,
+        })
+        return data.get("data", [])
+
+    def update_adset(self, adset_id: str, fields: dict) -> dict:
+        """Atualiza múltiplos campos de um adset. Serializa 'targeting' automaticamente."""
+        import json as _json
+        post_data = dict(fields)
+        if "targeting" in post_data and isinstance(post_data["targeting"], dict):
+            post_data["targeting"] = _json.dumps(post_data["targeting"])
+        return self._post(adset_id, post_data)
